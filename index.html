@@ -812,13 +812,13 @@ function wordsToLines(words, maxChars) {
 }
 
 // Estimates the collision radius for a manifestation node based on its text label size.
-// Uses ~4.8px/char (8px Poppins) and 10px line height to approximate the bounding box.
+// Uses ~9.6px/char (16px Poppins) and 19px line height to approximate the bounding box.
 function manifestationCollideRadius(d) {
   const words = (d.title || '').split(' ');
   const lines = wordsToLines(words, 30);
   const maxLen = Math.max(...lines.map(l => l.length));
-  const halfW = maxLen * 4.8 / 2 + 12;
-  const halfH = lines.length * 10 / 2 + 8;
+  const halfW = maxLen * 9.6 / 2 + 12;
+  const halfH = lines.length * 19 / 2 + 8;
   return Math.max(halfW, halfH);
 }
 
@@ -879,7 +879,7 @@ function renderAll() {
         g.filter(d => d.type === 'class')
           .append('text')
           .attr('class', 'prog-label prog-label--class')
-          .attr('font-size', '9px')
+          .attr('font-size', '13px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
@@ -897,14 +897,14 @@ function renderAll() {
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
-          .attr('font-size', '8px')
+          .attr('font-size', '16px')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
           .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 10);
+            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 19);
           });
 
         g.on('mouseover', showProgramTooltip)
