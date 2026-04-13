@@ -159,6 +159,7 @@
       text-anchor: middle;
     }
     .node-circle-hidden { display: none; }
+    .prog-label--class { text-transform: uppercase; }
 
     /* ─── Artifact circles ────────────────────────────────── */
     .artifact {
@@ -820,7 +821,7 @@ function renderAll() {
           .call(makeDrag(sim1));
 
         g.append('circle')
-          .attr('class', d => d.type === 'manifestation' ? 'node-circle node-circle-hidden' : 'node-circle')
+          .attr('class', 'node-circle node-circle-hidden')
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
           .attr('fill-opacity', 0.92)
@@ -831,7 +832,7 @@ function renderAll() {
         // Class label — two lines: class code, then full name
         g.filter(d => d.type === 'class')
           .append('text')
-          .attr('class', 'prog-label')
+          .attr('class', 'prog-label prog-label--class')
           .attr('font-size', '7.5px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
