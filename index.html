@@ -143,7 +143,7 @@
       flex: 1;
       position: relative;
       overflow: hidden;
-      background: var(--bg);
+      background: #000;
     }
     #main-svg {
       width: 100%;
@@ -210,14 +210,6 @@
     .score-fill  { height: 100%; border-radius: 3px; }
     .score-val  { font-size: 0.67rem; font-weight: 600; min-width: 22px; text-align: right; }
 
-    /* ─── Legend ─────────────────────────────────────────── */
-    .legend-bg { fill: rgba(250,249,245,0.88); stroke: #e2dfd4; stroke-width: 1; rx: 6; }
-    .legend-text {
-      font-family: 'Poppins', sans-serif;
-      font-size: 10px;
-      dominant-baseline: middle;
-      fill: #141413;
-    }
 
     /* ─── Scrollbar styling ──────────────────────────────── */
     .sidebar::-webkit-scrollbar { width: 4px; }
@@ -456,7 +448,6 @@ function setupSVG() {
   zoomLayer.append('g').attr('id', 'layer-prog-links');
   zoomLayer.append('g').attr('id', 'layer-art-nodes');   // artifacts UNDER program nodes
   zoomLayer.append('g').attr('id', 'layer-prog-nodes');  // program nodes always on top
-  svg.append('g').attr('id', 'layer-legend');            // legend stays fixed
 
   // Zoom + pan behavior
   zoom = d3.zoom()
@@ -804,10 +795,10 @@ function renderAll() {
           .attr('class', 'prog-label')
           .attr('font-size', '7.5px')
           .attr('font-weight', '500')
-          .attr('fill', '#222')
+          .attr('fill', '#fff')
           .attr('dy', d => nodeRadius(d) + 10)
           .attr('paint-order', 'stroke')
-          .attr('stroke', 'rgba(250,249,245,0.85)')
+          .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
@@ -817,10 +808,10 @@ function renderAll() {
           .append('text')
           .attr('class', 'prog-label')
           .attr('font-size', '6.5px')
-          .attr('fill', '#444')
+          .attr('fill', '#fff')
           .attr('dy', d => nodeRadius(d) + 9)
           .attr('paint-order', 'stroke')
-          .attr('stroke', 'rgba(250,249,245,0.85)')
+          .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
@@ -852,7 +843,6 @@ function renderAll() {
     );
 
   renderArtifactNodes();
-  renderLegend();
   updateArtifactCount();
 }
 
@@ -901,45 +891,6 @@ function renderArtifactNodes() {
     );
 }
 
-function renderLegend() {
-  const layer = svg.select('#layer-legend');
-  layer.selectAll('*').remove();
-
-  const classes = PROGRAM_DATA.classes.filter(c => state.visibleClasses.has(c.id));
-  if (!classes.length) return;
-
-  const rowH = 18, padX = 12, padY = 10;
-  const boxH = padY * 2 + classes.length * rowH;
-  const boxW = 170;
-  const bx = svgWidth - boxW - 12;
-  const by = 12;
-
-  layer.append('rect')
-    .attr('x', bx).attr('y', by)
-    .attr('width', boxW).attr('height', boxH)
-    .attr('rx', 6)
-    .attr('fill', 'rgba(250,249,245,0.9)')
-    .attr('stroke', '#e2dfd4')
-    .attr('stroke-width', 1);
-
-  classes.forEach((c, i) => {
-    const gy = by + padY + i * rowH + rowH / 2;
-    layer.append('circle')
-      .attr('cx', bx + padX + 5)
-      .attr('cy', gy)
-      .attr('r', 5)
-      .attr('fill', classColor(c.id))
-      .attr('fill-opacity', 0.85);
-    layer.append('text')
-      .attr('class', 'legend-text')
-      .attr('x', bx + padX + 14)
-      .attr('y', gy)
-      .text(c.title.length > 22 ? c.title.slice(0, 20) + '…' : c.title)
-      .attr('font-size', '9px')
-      .attr('fill', '#141413')
-      .attr('dominant-baseline', 'middle');
-  });
-}
 
 function updateArtifactCount() {
   document.getElementById('artifact-count').textContent =
