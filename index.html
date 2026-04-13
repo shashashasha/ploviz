@@ -158,6 +158,7 @@
       dominant-baseline: middle;
       text-anchor: middle;
     }
+    .node-circle-hidden { display: none; }
 
     /* ─── Artifact circles ────────────────────────────────── */
     .artifact {
@@ -353,7 +354,7 @@ function normalizeManifestations(data, ploKey) {
    COLOR SYSTEM
    ═══════════════════════════════════════════════════════════ */
 const PLO_COLORS = {
-  plo1: '#4e8a62',   // green  — Environmental
+  plo1: '#00da08',
   plo2: '#4872a4',   // blue   — Material
   plo3: '#b05c3a',   // terracotta — Equity
   plo4: '#7659a0'    // purple — Systems
@@ -363,19 +364,15 @@ function ploColor(ploId) { return PLO_COLORS[ploId] || '#888'; }
 
 function nodeColor(d) {
   const primaryPlo = (d.plos && d.plos[0]) || 'plo1';
-  const base = d3.color(PLO_COLORS[primaryPlo] || '#888');
-  if (d.type === 'class')         return d3.interpolateRgb(base, '#777')(0.3);
-  if (d.type === 'manifestation') return d3.interpolateRgb(base, '#fff')(0.35);
-  return '#888';
+  return PLO_COLORS[primaryPlo] || '#888';
 }
 
-// Artifact color: a slightly brighter version of their class's program color
+// Artifact color matches PLO color directly
 const CLASS_COLORS = {};
 function initClassColors(ploKey = 'PLO1') {
   const ploInternal = ploKey === 'PLO2' ? 'plo2' : 'plo1';
   PROGRAM_DATA.classes.forEach(c => {
-    const base = d3.color(PLO_COLORS[ploInternal] || '#888');
-    CLASS_COLORS[c.id] = d3.interpolateRgb(base, '#fff')(0.15);
+    CLASS_COLORS[c.id] = PLO_COLORS[ploInternal] || '#888';
   });
 }
 
@@ -528,7 +525,6 @@ function setupSVG() {
     svgWidth = w; svgHeight = h;
     svg.attr('width', svgWidth).attr('height', svgHeight);
     if (sim1) sim1.alpha(0.2).restart();
-    renderLegend(); // legend is positioned relative to svgWidth
   }).observe(wrap);
 }
 
@@ -586,11 +582,14 @@ function customAttractionForce(manifestationNodes) {
         artifact.vy += dy * s;
       });
 
-      // Artifacts with no scores at all: gentle pull toward canvas center
+      // Unscored artifacts: strong repulsion outward from center
       if (totalScore === 0) {
         const cx = SIM_W * 0.5, cy = SIM_H * 0.5;
-        artifact.vx += (cx - artifact.x) * 0.002 * alpha;
-        artifact.vy += (cy - artifact.y) * 0.002 * alpha;
+        const dx = artifact.x - cx;
+        const dy = artifact.y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        artifact.vx += (dx / dist) * 2.0 * alpha;
+        artifact.vy += (dy / dist) * 2.0 * alpha;
       }
     });
   }
@@ -821,6 +820,7 @@ function renderAll() {
           .call(makeDrag(sim1));
 
         g.append('circle')
+          .attr('class', d => d.type === 'manifestation' ? 'node-circle node-circle-hidden' : 'node-circle')
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
           .attr('fill-opacity', 0.92)
@@ -828,32 +828,54 @@ function renderAll() {
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
 
-        // Class label — small text below circle with subtle background
+        // Class label — two lines: class code, then full name
         g.filter(d => d.type === 'class')
           .append('text')
           .attr('class', 'prog-label')
           .attr('font-size', '7.5px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
-          .attr('dy', d => nodeRadius(d) + 10)
           .attr('paint-order', 'stroke')
           .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
-          .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
+          .each(function(d) {
+            const el = d3.select(this);
+            const sep = d.title.indexOf(' — ');
+            const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
+            const name = sep >= 0 ? d.title.slice(sep + 3) : '';
+            const r = nodeRadius(d);
+            el.append('tspan').attr('x', 0).attr('dy', r + 10).text(code);
+            if (name) el.append('tspan').attr('x', 0).attr('dy', '1.2em').text(name);
+          });
 
-        // Manifestation label — italic, smaller
+        // Manifestation label — full title, word-wrapped, centered on node point
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
           .attr('font-size', '8px')
           .attr('fill', '#fff')
-          .attr('dy', d => nodeRadius(d) + 9)
           .attr('paint-order', 'stroke')
           .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
-          .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
+          .each(function(d) {
+            const el = d3.select(this);
+            const words = d.title.split(' ');
+            const WPL = 4; // words per line
+            const lines = [];
+            for (let i = 0; i < words.length; i += WPL) {
+              lines.push(words.slice(i, i + WPL).join(' '));
+            }
+            const lineH = 10; // px, ~1.2em for 8px font
+            const offsetY = -((lines.length - 1) * lineH) / 2;
+            lines.forEach((line, i) => {
+              el.append('tspan')
+                .attr('x', 0)
+                .attr('dy', i === 0 ? offsetY : lineH)
+                .text(line);
+            });
+          });
 
         g.on('mouseover', showProgramTooltip)
          .on('mouseleave', hideTooltip);
