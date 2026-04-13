@@ -862,17 +862,7 @@ function renderAll() {
             const sep = d.title.indexOf(' — ');
             const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
             const name = sep >= 0 ? d.title.slice(sep + 3) : '';
-            const r = nodeRadius(d);
-            const ts1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-            ts1.setAttribute('x', 0); ts1.setAttribute('dy', r + 11);
-            ts1.textContent = code;
-            this.appendChild(ts1);
-            if (name) {
-              const ts2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-              ts2.setAttribute('x', 0); ts2.setAttribute('dy', '1.2em');
-              ts2.textContent = name;
-              this.appendChild(ts2);
-            }
+            wrapTextLabel(this, name ? [code, name] : [code], 12);
           });
 
         // Manifestation label — single <text> per node, word-wrapped via wrapTextLabel
