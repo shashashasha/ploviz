@@ -693,7 +693,7 @@ function buildProgramSimulation(visibleClasses) {
     .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : 0)
       .strength(d => d.type === 'class' ? 0.06 : 0))
     .force('collide', d3.forceCollide()
-      .radius(d => nodeRadius(d) + 6)
+      .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
       .strength(0.8))
     .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.02)
@@ -794,6 +794,34 @@ function makeDrag(simulation) {
 /* ═══════════════════════════════════════════════════════════
    RENDER HELPERS
    ═══════════════════════════════════════════════════════════ */
+// Splits an array of words into lines where each line stays under maxChars.
+function wordsToLines(words, maxChars) {
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? current + ' ' + word : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+// Estimates the collision radius for a manifestation node based on its text label size.
+// Uses ~4.8px/char (8px Poppins) and 10px line height to approximate the bounding box.
+function manifestationCollideRadius(d) {
+  const words = (d.title || '').split(' ');
+  const lines = wordsToLines(words, 30);
+  const maxLen = Math.max(...lines.map(l => l.length));
+  const halfW = maxLen * 4.8 / 2 + 12;
+  const halfH = lines.length * 10 / 2 + 8;
+  return Math.max(halfW, halfH);
+}
+
 // Appends <tspan> children to a single SVG <text> DOM node.
 // lines: string[] — one entry per visual line.
 // lineH: vertical spacing in px between lines.
@@ -876,10 +904,7 @@ function renderAll() {
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            const words = d.title.split(' ');
-            const lines = [];
-            for (let i = 0; i < words.length; i += 4) lines.push(words.slice(i, i + 4).join(' '));
-            wrapTextLabel(this, lines, 10);
+            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 10);
           });
 
         g.on('mouseover', showProgramTooltip)
