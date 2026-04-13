@@ -211,6 +211,26 @@
     .score-val  { font-size: 0.67rem; font-weight: 600; min-width: 22px; text-align: right; }
 
 
+    /* ─── PLO selector ───────────────────────────────────── */
+    .plo-select {
+      width: 100%;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.72rem;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      margin-bottom: 0.5rem;
+    }
+    .plo-description {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin: 0;
+    }
+
     /* ─── Scrollbar styling ──────────────────────────────── */
     .sidebar::-webkit-scrollbar { width: 4px; }
     .sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -227,8 +247,12 @@
 <div class="app-body">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-section">
-      <h3>Classes</h3>
-      <div class="filter-list" id="class-filters"></div>
+      <h3>Program Learning Outcome</h3>
+      <select id="plo-select" class="plo-select">
+        <option value="PLO1">PLO 1 — Socio-ecologically sustainable</option>
+        <option value="PLO2">PLO 2 — Situated knowledge</option>
+      </select>
+      <p id="plo-description" class="plo-description"></p>
     </div>
     <div class="sidebar-section">
       <h3>Authors</h3>
@@ -267,17 +291,31 @@ const PROGRAM_DATA = {
   ],
 
   // Populated at runtime from data/manifestations.json
-  manifestations: []
+  manifestations: [],
+
+  // Full PLO keyed object from manifestations.json — populated at runtime
+  ploData: {}
 };
 
 /* ═══════════════════════════════════════════════════════════
-   NORMALIZE MANIFESTATIONS — converts both old and new JSON
-   formats into the internal representation used by the graph.
-   New format: { manifestations: [{id, manifestation, classes}] }
-   Old format: [{id, title, plos, classes}]
+   NORMALIZE MANIFESTATIONS — converts old and new JSON formats
+   into the internal representation used by the graph.
+   New keyed format: { PLO1: { plo, title, manifestations: [] }, PLO2: … }
+   Legacy object format: { manifestations: [{id, manifestation, classes}] }
+   Legacy array format:  [{id, title, plos, classes}]
+   Pass ploKey (e.g. 'PLO1') to extract a specific PLO's manifestations.
    ═══════════════════════════════════════════════════════════ */
-function normalizeManifestations(data) {
-  const raw = Array.isArray(data) ? data : (data.manifestations || []);
+function normalizeManifestations(data, ploKey) {
+  // New keyed format: { PLO1: { manifestations: [] }, … }
+  let raw;
+  let plos;
+  if (ploKey && data[ploKey]) {
+    raw  = data[ploKey].manifestations || [];
+    plos = [ploKey.toLowerCase()];   // 'PLO1' → 'plo1', 'PLO2' → 'plo2'
+  } else {
+    raw  = Array.isArray(data) ? data : (data.manifestations || []);
+    plos = ['plo1'];
+  }
 
   // Human-readable class names → internal IDs used in PROGRAM_DATA
   const CLASS_NAME_MAP = {
@@ -288,15 +326,15 @@ function normalizeManifestations(data) {
     'DES 797':  'des797'
   };
 
-  // M-id → CSV score column (only the 7 themes scored in current artifacts.csv)
+  // Manifestation id → CSV score column (only the 7 themes scored in current artifacts.csv)
   const SCORE_COL_MAP = {
-    'M1':  'score_material',
-    'M11': 'score_slowness',
-    'M12': 'score_environmental_crisis',
-    'M13': 'score_natural_world',
-    'M14': 'score_equitable_design',
-    'M15': 'score_stewardship',
-    'M16': 'score_more_than_human'
+    'P1M01': 'score_material',
+    'P1M11': 'score_slowness',
+    'P1M12': 'score_environmental_crisis',
+    'P1M13': 'score_natural_world',
+    'P1M14': 'score_equitable_design',
+    'P1M15': 'score_stewardship',
+    'P1M16': 'score_more_than_human'
   };
 
   return raw.map(m => {
@@ -304,7 +342,7 @@ function normalizeManifestations(data) {
     return {
       id:          m.id,
       title:       m.manifestation || m.title || m.id,
-      plos:        m.plos || ['plo1'],
+      plos:        m.plos || plos,
       classes,
       scoreColumn: SCORE_COL_MAP[m.id] || null
     };
@@ -333,10 +371,10 @@ function nodeColor(d) {
 
 // Artifact color: a slightly brighter version of their class's program color
 const CLASS_COLORS = {};
-function initClassColors() {
+function initClassColors(ploKey = 'PLO1') {
+  const ploInternal = ploKey === 'PLO2' ? 'plo2' : 'plo1';
   PROGRAM_DATA.classes.forEach(c => {
-    const primaryPlo = c.plos[0];
-    const base = d3.color(PLO_COLORS[primaryPlo] || '#888');
+    const base = d3.color(PLO_COLORS[ploInternal] || '#888');
     CLASS_COLORS[c.id] = d3.interpolateRgb(base, '#fff')(0.15);
   });
 }
@@ -361,7 +399,8 @@ const state = {
   visibleClasses:        new Set(PROGRAM_DATA.classes.map(c => c.id)),
   visibleAuthors:        new Set(),
   allArtifacts:          [],
-  activeManifestationId: null   // ID of currently pinned manifestation, or null
+  activeManifestationId: null,  // ID of currently pinned manifestation, or null
+  activePlo:             'PLO1'
 };
 
 // D3 globals
@@ -639,7 +678,7 @@ function buildProgramSimulation(visibleClasses) {
 
   if (sim1) sim1.stop();
 
-  const manifestDist = 200;
+  const manifestDist = 150;
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
@@ -946,40 +985,51 @@ function updateFilters(authorOnly = false) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   PLO SWITCHER
+   ═══════════════════════════════════════════════════════════ */
+function switchPlo(ploKey) {
+  state.activePlo = ploKey;
+  PROGRAM_DATA.manifestations = normalizeManifestations(PROGRAM_DATA.ploData, ploKey);
+  // Derive visible classes from this PLO's manifestations
+  state.visibleClasses = new Set(
+    PROGRAM_DATA.manifestations.flatMap(m => m.classes)
+  );
+  clearManifestationHighlight();
+  initClassColors(ploKey);
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+  renderAll();
+  startSimulations(true);
+  renderPloInfo();
+}
+
+/* ═══════════════════════════════════════════════════════════
    SIDEBAR
    ═══════════════════════════════════════════════════════════ */
 function renderSidebar() {
-  renderClassFilters();
+  renderPloInfo();
   renderAuthorFilters();
 }
 
-function renderClassFilters() {
-  const container = document.getElementById('class-filters');
-  container.innerHTML = '';
-  PROGRAM_DATA.classes.forEach(c => {
-    const label = document.createElement('label');
-    label.className = 'filter-item';
+let _ploSelectListenerAttached = false;
+function renderPloInfo() {
+  const sel = document.getElementById('plo-select');
+  const desc = document.getElementById('plo-description');
+  if (!sel || !desc) return;
 
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = state.visibleClasses.has(c.id);
-    cb.dataset.classId = c.id;
-    cb.addEventListener('change', e => {
-      if (e.target.checked) state.visibleClasses.add(c.id);
-      else state.visibleClasses.delete(c.id);
-      updateFilters(false);
-    });
+  sel.value = state.activePlo;
+  desc.textContent = PROGRAM_DATA.ploData[state.activePlo]?.title || '';
 
-    const swatch = document.createElement('span');
-    swatch.className = 'swatch';
-    swatch.style.background = classColor(c.id);
-
-    const name = document.createElement('span');
-    name.textContent = c.title;
-
-    label.append(cb, swatch, name);
-    container.appendChild(label);
-  });
+  // Attach listener only once to avoid stacking handlers
+  if (!_ploSelectListenerAttached) {
+    sel.addEventListener('change', e => switchPlo(e.target.value));
+    _ploSelectListenerAttached = true;
+  }
 }
 
 function renderAuthorFilters() {
@@ -1140,7 +1190,7 @@ document.getElementById('csv-input').addEventListener('change', async e => {
    INIT
    ═══════════════════════════════════════════════════════════ */
 async function init() {
-  initClassColors();
+  initClassColors(state.activePlo);
 
   let csvText = null;
   try {
@@ -1149,7 +1199,11 @@ async function init() {
       fetch('./data/manifestations.json').catch(() => null)
     ]);
     if (csvRes?.ok) csvText = await csvRes.text();
-    if (mRes?.ok)   PROGRAM_DATA.manifestations = normalizeManifestations(await mRes.json());
+    if (mRes?.ok) {
+      const data = await mRes.json();
+      PROGRAM_DATA.ploData = data;
+      PROGRAM_DATA.manifestations = normalizeManifestations(data, state.activePlo);
+    }
   } catch (_) { /* file:// protocol */ }
 
   const rows = d3.csvParse(csvText || '');
