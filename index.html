@@ -351,6 +351,11 @@ function initClassColors() {
 
 function classColor(classId) { return CLASS_COLORS[classId] || '#888'; }
 
+function artifactFill(d) {
+  const hasScore = PROGRAM_DATA.manifestations.some(m => (d[m.scoreColumn || m.id] || 0) > 0);
+  return hasScore ? classColor(d.class) : '#b8b8b8';
+}
+
 function nodeRadius(d) {
   if (d.type === 'class')         return 18;
   if (d.type === 'manifestation') return 13;
@@ -492,16 +497,7 @@ function setupSVG() {
     if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
     svgWidth = w; svgHeight = h;
     svg.attr('width', svgWidth).attr('height', svgHeight);
-    if (sim1) {
-      sim1.nodes()
-        .filter(n => n.type === 'class')
-        .forEach(n => {
-          const pos = classCirclePos(n.id);
-          n.fx = pos.x; n.fy = pos.y;
-          n.x  = pos.x; n.y  = pos.y;
-        });
-      sim1.alpha(0.2).restart();
-    }
+    if (sim1) sim1.alpha(0.2).restart();
     renderLegend(); // legend is positioned relative to svgWidth
   }).observe(wrap);
 }
@@ -581,8 +577,8 @@ function classCirclePos(classId) {
   if (idx < 0) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
   const cx = SIM_W * 0.30;
   const cy = SIM_H * 0.50;
-  const rx = SIM_W * 0.18;
-  const ry = SIM_H * 0.30;
+  const rx = SIM_W * 0.11;
+  const ry = SIM_H * 0.19;
   const angle = (idx / classes.length) * 2 * Math.PI - Math.PI / 2;
   return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
 }
@@ -603,11 +599,11 @@ function buildProgramSimulation(visibleClasses) {
   const nodes = [...classNodes, ...manifestationNodes];
   const nodeById = new Map(nodes.map(n => [n.id, n]));
 
-  // ── Pin class nodes to circle positions ──────────────────
+  // ── Set initial class positions (soft-pinned via home force) ─
   classNodes.forEach(n => {
     const pos = classCirclePos(n.id);
     n.x  = pos.x;  n.y  = pos.y;
-    n.fx = pos.x;  n.fy = pos.y;  // pinned — drag releases these
+    // No hard pin — forceX/forceY home forces keep them near the circle
   });
 
   // Links: class → manifestation only
@@ -652,17 +648,20 @@ function buildProgramSimulation(visibleClasses) {
 
   if (sim1) sim1.stop();
 
-  // Link distance scales with viewport
-  const manifestDist = 126;
+  const manifestDist = 200;
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
       .id(d => d.id)
-      .distance(manifestDist)
-      .strength(0.6))
+      .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
+      .strength(d => d.target.classes?.length >= 2 ? 1.0 : 0.4))
     .force('charge', d3.forceManyBody()
-      // Classes are pinned so charge only matters for manifestations
-      .strength(d => d.type === 'manifestation' ? -120 : 0))
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -120 : 0))
+    // Soft home force — keeps class nodes near their circle positions
+    .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
+    .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
     .force('collide', d3.forceCollide()
       .radius(d => nodeRadius(d) + 6)
       .strength(0.8))
@@ -865,7 +864,7 @@ function renderArtifactNodes() {
       enter => enter.append('circle')
         .attr('class', 'artifact')
         .attr('r', 3.5)
-        .attr('fill', d => classColor(d.class))
+        .attr('fill', d => artifactFill(d))
         .attr('fill-opacity', 0.7)
         .attr('stroke', 'none')
         .attr('cx', d => d.x || SIM_W * 0.65)
@@ -887,13 +886,14 @@ function renderArtifactNodes() {
           } else {
             d3.select(event.currentTarget)
               .attr('r', 3.5)
+              .attr('fill', artifactFill(d))
               .attr('stroke', 'none')
               .attr('fill-opacity', 0.7);
             restoreProgNodes();
           }
           hideTooltip();
         }),
-      update => update.attr('fill', d => classColor(d.class)),
+      update => update.attr('fill', d => artifactFill(d)),
       exit   => exit.transition().duration(180)
         .attr('r', 0)
         .attr('fill-opacity', 0)
@@ -1091,6 +1091,7 @@ function clearManifestationHighlight() {
   state.activeManifestationId = null;
   d3.selectAll('circle.artifact')
     .attr('r',            3.5)
+    .attr('fill',         d => artifactFill(d))
     .attr('fill-opacity', 0.7)
     .attr('stroke',       'none');
   restoreProgNodes();
