@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Program Learning Outcomes — Artifact Visualization</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Design Tokens ─────────────────────────────────── */
+    :root {
+      --bg:         #faf9f5;
+      --surface:    #ffffff;
+      --surface2:   #f2f0e8;
+      --border:     #e2dfd4;
+      --text:       #141413;
+      --text-muted: #9c9a90;
+      --accent:     #d97757;
+      --radius:     8px;
+      --sidebar-w:  210px;
+      --header-h:   48px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    .app-header {
+      height: var(--header-h);
+      background: var(--text);
+      color: var(--bg);
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      flex-shrink: 0;
+      gap: 0.75rem;
+    }
+    .app-header h1 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      flex: 1;
+    }
+    .header-badge {
+      font-size: 0.65rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+
+    /* ─── Body Layout ────────────────────────────────────── */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar-section {
+      padding: 0.9rem 0.9rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+    .sidebar-section h3 {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.55rem;
+    }
+    .filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 3px 4px;
+      border-radius: 4px;
+      transition: background 0.1s;
+      user-select: none;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item input[type="checkbox"] {
+      width: 13px; height: 13px;
+      accent-color: var(--text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .swatch {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .filter-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ─── Load CSV button ─────────────────────────────────── */
+    .btn-load {
+      display: block;
+      text-align: center;
+      background: var(--text);
+      color: var(--bg);
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.72rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    .btn-load:hover { opacity: 0.82; }
+    .btn-load-wrap { padding: 0.75rem 0.9rem; }
+
+    /* ─── Canvas ─────────────────────────────────────────── */
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    #main-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ─── Program Graph Node Labels ──────────────────────── */
+    .prog-label {
+      font-family: 'Poppins', sans-serif;
+      pointer-events: none;
+      dominant-baseline: middle;
+      text-anchor: middle;
+    }
+
+    /* ─── Artifact circles ────────────────────────────────── */
+    .artifact {
+      cursor: pointer;
+      transition: r 0.1s;
+    }
+
+    /* ─── Tooltip ─────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.8rem 0.95rem;
+      max-width: 290px;
+      min-width: 200px;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06);
+      z-index: 200;
+      display: none;
+    }
+    #tooltip.visible { display: block; }
+
+    .tt-title   { font-weight: 600; font-size: 0.78rem; margin-bottom: 2px; }
+    .tt-meta    { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 6px; }
+    .tt-divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+    .tt-excerpt {
+      font-size: 0.71rem;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tt-scores-label {
+      font-size: 0.63rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .score-row  { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .score-name { flex: 0 0 120px; font-size: 0.67rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .score-fill  { height: 100%; border-radius: 3px; }
+    .score-val  { font-size: 0.67rem; font-weight: 600; min-width: 22px; text-align: right; }
+
+    /* ─── Legend ─────────────────────────────────────────── */
+    .legend-bg { fill: rgba(250,249,245,0.88); stroke: #e2dfd4; stroke-width: 1; rx: 6; }
+    .legend-text {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10px;
+      dominant-baseline: middle;
+      fill: #141413;
+    }
+
+    /* ─── Scrollbar styling ──────────────────────────────── */
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Program Learning Outcomes — Artifact Visualization</h1>
+  <span class="header-badge" id="artifact-count">0 artifacts</span>
+</header>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h3>Classes</h3>
+      <div class="filter-list" id="class-filters"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Authors</h3>
+      <div class="filter-list" id="author-filters"></div>
+    </div>
+    <div class="btn-load-wrap">
+      <label class="btn-load" for="csv-input">+ Load CSV</label>
+      <input type="file" id="csv-input" accept=".csv" style="display:none" />
+    </div>
+  </aside>
+
+  <main class="canvas-wrap" id="canvas-wrap">
+    <svg id="main-svg"></svg>
+    <div id="tooltip"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PROGRAM STRUCTURE — edit this object to match your program
+   ═══════════════════════════════════════════════════════════ */
+const PROGRAM_DATA = {
+  plos: [
+    { id: 'plo1', title: 'PLO 1: Socio-ecologically Sustainable Processes' },
+    { id: 'plo2', title: 'PLO 2: [Placeholder]' },
+    { id: 'plo3', title: 'PLO 3: [Placeholder]' },
+    { id: 'plo4', title: 'PLO 4: [Placeholder]' }
+  ],
+
+  classes: [
+    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',         plos: ['plo1'] },
+    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',         plos: ['plo1'] },
+    { id: 'des741',  title: 'DES 741 — Cross-disciplinary Studio: Symbiotic Futures', plos: ['plo1'] },
+    { id: 'des751',  title: 'DES 751 — Design Writing',                        plos: ['plo1'] },
+    { id: 'des730',  title: 'DES 730A/B — Transformation Design',              plos: ['plo1'] },
+    { id: 'des796',  title: 'DES 796 — Thesis I',                              plos: ['plo1'] },
+    { id: 'des797',  title: 'DES 797 — Thesis II',                             plos: ['plo1'] },
+    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',    plos: ['plo1'] },
+    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',    plos: ['plo1'] }
+  ],
+
+  manifestations: [
+    // ── DES 720A ──────────────────────────────────────────
+    { id: 'des720a_biomaterials', title: 'Engagement with bio-materials and alternative material practices',         plos: ['plo1'], classes: ['des720a'] },
+    { id: 'des720a_waste',        title: 'Understanding that waste is a design flaw',                               plos: ['plo1'], classes: ['des720a'] },
+    { id: 'des720a_ecology',      title: 'Environmental awareness and entanglement with ecological systems',        plos: ['plo1'], classes: ['des720a'] },
+    { id: 'des720a_principles',   title: 'Underlying principles that inform the work',                              plos: ['plo1'], classes: ['des720a'] },
+    { id: 'des720a_ai_ethics',    title: 'Critical engagement with the ethics of AI',                              plos: ['plo1'], classes: ['des720a'] },
+
+    // ── DES 720B ──────────────────────────────────────────
+    { id: 'des720b_waste',        title: 'Waste reduction and additive vs. subtractive manufacturing',              plos: ['plo1'], classes: ['des720b'] },
+    { id: 'des720b_pollution',    title: 'Proposals to reduce harmful manufacturing byproducts and remediate environment', plos: ['plo1'], classes: ['des720b'] },
+    { id: 'des720b_energy',       title: 'Considering energy consumption of technologies used in making',           plos: ['plo1'], classes: ['des720b'] },
+    { id: 'des720b_emerging',     title: 'Research, experimentation, and criticism of emerging manufacturing processes', plos: ['plo1'], classes: ['des720b'] },
+    { id: 'des720b_resources',    title: 'Intentional use of materials based on prevalence and availability',       plos: ['plo1'], classes: ['des720b'] },
+    { id: 'des720b_history',      title: 'Connecting to historical ways of being/doing and environmental change',   plos: ['plo1'], classes: ['des720b'] },
+
+    // ── DES 741 — IDs must match CSV score columns ────────
+    { id: 'score_slowness',             title: 'Slowness (deep listening, somatics, sustainable pacing)',                      plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_material',             title: 'Material considerations',                                                      plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_environmental_crisis', title: 'Content that engages the current environmental crisis',                        plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_natural_world',        title: 'Examining our relationship to the natural world',                              plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_equitable_design',     title: 'Design for an equitable and just society',                                    plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_stewardship',          title: 'Stewardship — attitude of care for living systems and the nonhuman world',    plos: ['plo1'], classes: ['des741'] },
+    { id: 'score_more_than_human',      title: 'Considering more than human stakeholders (ecosystems, animals, weather, materiality)', plos: ['plo1'], classes: ['des741'] },
+
+    // ── DES 751 ───────────────────────────────────────────
+    { id: 'des751_diy',           title: 'DIY ethos',                                                                          plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_lowcost',       title: 'Low-cost production',                                                                plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_material',      title: 'Material constraints',                                                               plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_diary',         title: 'Diary and journal-inspired practices',                                               plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_generative',    title: 'Generative methodologies: workshops, annotated collage, and material play',          plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_accessibility', title: 'Accessibility of knowledge sources',                                                 plos: ['plo1'], classes: ['des751'] },
+    { id: 'des751_speculative',   title: 'Speculative projects as methodologies for interpreting emerging ideas',              plos: ['plo1'], classes: ['des751'] },
+
+    // ── DES 730 ───────────────────────────────────────────
+    { id: 'des730_modification',  title: 'Modification to existing service/environment/artifact reflecting community needs',   plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_openended',     title: 'Open-ended questions and structured conversation with deep-knowledge holders',       plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_insitu',        title: 'In-situ, dynamic field research involving a participant',                            plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_documentation', title: 'Photos, textures, and video of social rituals as outsider (not insider)',            plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_spradley',      title: "Unobtrusive interaction using Spradley's 9 Dimensions",                             plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_citations',     title: 'Annotations and citations: census data, GIS, academic articles',                    plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_expertise',     title: 'Man-on-the-street vs. expert — formal, semi-formal, and informal',                  plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_mapping',       title: 'Observational mapping and behavioral zoning',                                        plos: ['plo1'], classes: ['des730'] },
+    { id: 'des730_assumptions',   title: 'Exploring unfamiliar people and locations to break assumptions',                     plos: ['plo1'], classes: ['des730'] },
+
+    // ── DES 796 ───────────────────────────────────────────
+    { id: 'des796_transcendence', title: 'Material transcendence, explorations of non-materiality',                            plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_resilience',    title: 'Evidence of resilience: sustained engagement, adaptive practice, ethics',            plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_sitespecific',  title: 'Site-specific inquiry (culturally, geographically, ecologically)',                   plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_slowness',      title: 'Slowness (long-term thinking, deep listening, sustainable pacing)',                  plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_morethan',      title: 'Considering more than human stakeholders',                                           plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_care',          title: 'Care, service, and contribution',                                                    plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_dialogue',      title: 'Deliberate dialogue: community, co-authorship, co-research, co-leadership',         plos: ['plo1'], classes: ['des796'] },
+    { id: 'des796_positionality', title: 'Positionality — students locating themselves as subjects within their own work',     plos: ['plo1'], classes: ['des796'] },
+
+    // ── DES 797 ───────────────────────────────────────────
+    { id: 'des797_sustained',     title: 'Sustained and systematic practice (continuation from Thesis I)',                     plos: ['plo1'], classes: ['des797'] },
+    { id: 'des797_transcendence', title: 'Material transcendence, explorations of non-materiality',                            plos: ['plo1'], classes: ['des797'] },
+    { id: 'des797_resilience',    title: 'Resilience: sustained engagement, adaptive practice, ethics and integrity',          plos: ['plo1'], classes: ['des797'] },
+    { id: 'des797_ecological',    title: 'Use of ecologically sustainable materials (book, paper, ink, production processes)', plos: ['plo1'], classes: ['des797'] },
+    { id: 'des797_community',     title: 'Work in the context of community and social engagement',                             plos: ['plo1'], classes: ['des797'] }
+
+    // DES 710A and DES 710B — manifestations to be added
+  ]
+};
+
+/* ═══════════════════════════════════════════════════════════
+   EMBEDDED CSV — fallback when not served over HTTP
+   ═══════════════════════════════════════════════════════════ */
+const EMBEDDED_CSV = `author,thesis_title,class,paragraph,score_slowness,score_material,score_environmental_crisis,score_natural_world,score_equitable_design,score_stewardship,score_more_than_human
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Research Questions ● How can we use existing tools/systems/cases to reduce misinformation in mass communication? ● How can design support users in reducing confirmation biases and help them judge the authenticity of a piece of news? ● How can we design support dialogues between users to promote exposure to multiple perspectives?,0,0,0,0,45,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Abstract Fake news, as one of the most controversial social issues in recent years, has prompted intense discussion around the topics of propaganda, disinformation, post-truth political power etc. We are in the era, in which the information is speed1. decontextualized and disseminated at incredible This thesis addresses the phenomenon of users’ ideological polarization under the context of Confirmation misinformation in mass communications. By discussing the idea of Bias2, Filter Bubbles3, Serendipity and Deliberative Democracy, this thesis",0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"1 Dan Silvestre, “Lessons from Amusing Ourselves to Death by Neil Postman,” Medium. Medium, September 11, 2018. 2 Plous, Scott, “The Psychology of Judgment and Decision Making,” p. 233 Technopedia, “Definition – What does Filter Bubble mean?,” 3 https://www.techopedia.com/definition/28556/filter-bubble",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,4 discusses how we as designers can respond to minimize disinformation and bias. This thesis argues that design can create serendipitous dialogue and experiences among users to minimize the ideological polarization.,0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Introduction ARPAnet”4 The first Internet network developed in the 1960's was based on the utopian dream of a transparent, equal, and decentralised communication system. post-truth era5 Fifty years later we live in the so called as an epoch “in which objective facts are less influential in shaping public opinion than appeals to belief.”6 The emotion and personal online environment is a space where This invisibility, anonymity, and asynchronous communication shape interaction. thesis is an exploration in how to promote discourse and serendipity to connect users that are separated by bias. It discusses confirmation bias that is based on cultural background and how it can be overcome. It also questions how users’ desire influences the ability to absorb accurate information and the role of algorithms and propaganda. This thesis employs the concepts of “architecture of",0,0,0,0,40,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"4 History.com editors, The Invention of the Internet, https://www.history.com/topics/inventions/invention-of-the-internet 5 Dan Silvestre, “Lessons from Amusing Ourselves to Death by Neil Postman,” Medium. Medium, September 11, 2018. 6 Dan Silvestre, “Lessons from Amusing Ourselves to Death by Neil Postman.”",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"5 serendipity”7 democracy”8 and “deliberative to diversify the information input for users, to minimize ideology polarization and misinformation.",0,0,0,0,50,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Glossary Of Terms Misinformation False or inaccurate information, especially that which is deliberately intended to deceive.",0,0,0,0,15,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Subjective Truth “Subjective truth is a truth based on a person's perspective, feelings, or opinions. Everything we know is based on our input - our senses, our perception. Thus, everything we know is subjective. All truths are subjective.”",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Filter Bubble “a situation in which an Internet user encounters only information and opinions that conform to and reinforce their own beliefs, caused by algorithms that experience.”9 personalize an individual’s online",0,0,0,0,20,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Confirmation Bias “A psychological bias that People also tend to interpret ambiguous evidence as position.”10 supporting their existing,0,0,0,0,15,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Liz Danzico, “The Design of Serendipity is not by chance,” DOI: 7 http://doi.acm.org/10.1145/1836216.1836220 Jeff Cain (May 2016). ""The Emerging Issue of Digital Empathy,"" (American Journal of 8 Pharmaceutical Education 80 (4)) doi:10.5688/ Eli Pariser, https://www.lexico.com/en/definition/filter_bubble 9 10 “Confirmation Bias,” Dictionary.com, Dictionary.com, www.dictionary.com/browse/confirmation-bias?s=t. 6 Echo Chamber An environment in which a person encounters only beliefs or opinions that coincide with their own so that their existing views are reinforced and alternative considered.11 ideas are not",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Post-truth “Relating to or denoting circumstances in which objective facts are less influential belief.”12 in shaping public opinion than appeals to emotion and personal,0,0,0,0,15,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Architecture of Serendipity 13 A system or common space to encourage people to mingle together.,0,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Deliberative Democracy A form of democracy in which deliberation is central to decision-making.14,0,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"11 Huffington Post, “The Huffington Post ""Are Filter-bubbles Shrinking Our Minds?"" (the Wayback Machine, 2016) 12 Dan Silvestre, “Lessons from Amusing Ourselves to Death by Neil Postman.” 13 Urbano Reviglio, Serendipity by Design? How to Turn from Diversity Exposure to Diversity Experience to Face Filter Bubbles in Social Media, Internet Science: 4th International Conference, INSCI 2017, Thessaloniki, Greece, November 22-24, 2017, Proceedings (pp.281-300)",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"14 Landemore, HÉLÈNE (2017). ""Deliberative Democracy as Open, Not ( Just) Representative Democracy"". Dædalus, the Journal of the American Academy of Arts & Sciences. 7 Fake News in Pandemic Situation",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"A commitment to telling the truth is thought to be one of the most essential attributes of the media. However, as the idea of “Fake news” - information that intentionally misleads the users - becomes popular and permeates both printed or digital media, we might claim that the function of the media has changed. Historically, fake news was fabricated to incite people politically or to gain prot. It is common throughout history. For example, The Lisbon Earthquake in 1755 was described as a religious event: “An entire genre of fake news pamphlets (relações de sucessos) emerged in Portugal, claiming that some survivors owed Mary.”15 their lives to an apparition of the Virgin",0,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Because of the popularity of social media, fake news disseminates faster and more widely. In the digital era, politics and profit are still the main drivers for misinformation, satire and sensationalism come second. Influenced by those simulations, fake news has evolved into more sophisticated mechanisms as communication technologies advance, including recommended systems and smooth user experience. Today, 60% Americans receive fake news from social media16.“In 2017, 29 percent of those surveyed worldwide said they ‘often or",0,0,0,0,40,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"15 Jacob Soll, “The long and Brutal History of Fake News.” https://www.politico.com/magazine/story/2016/12/fake-news-history-long-violent-214535. 16 Elle Hunt, ""What is fake news? How to spot it and what you can do to stop it,"" (The Guardian. Retrieved January 15, 2017.)",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"8 sometimes avoid the news,’ including 38 percent in the United States and 24 percent in the U.K. By 2019, those numbers had increased to 32 percent (+11).”17 worldwide (+3), 41 percent in the U.S. (+3), and 35 percent in the U.K. During the Covid 19 Pandemic, news has been reported to generate stress, exhaustion”18 anxiety, depression, fear, and The negative impact of misinformation has been enlarged as the viewers receive more news when they are quarantined than usual.",0,0,0,0,20,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"The quantity of news has been updated on a magnitude scale in every minute to track the pandemic situations. Moreover, The fear for unknown conditions pushes people to stare at the case number, twitter posts, and any related news reports. As compulsive viewers, people are probably to get accessibilities to misinformation unintentionally.",0,0,15,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Guy Berger is the Director for Policies and Strategies regarding Communication and Information at UNESCO, explaining that “There seems to be barely an area left untouched by disinformation in relation to the COVID-19 crisis, ranging from the origin of the coronavirus, through to unproven prevention and ‘cures’, and",0,0,15,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"17 Nic Newman, Richard Fletcher, Antonis Kalogeropoulos,“Reuter Institute Digital News Report 2019,”https://reutersinstitute.politics.ox.ac.uk/sites/default/files/2019-06/DNR_2019_FIN AL_0.pdf 18Joshua Benton, ”Why do some people avoid news? Because they don’t trust us — or because they don’t think we add value to their lives?”https://www.niemanlab.org/2019/06/why-do-some-people-avoid-news-because-th ey-dont-trust-us-or-because-they-dont-think-we-add-value-to-their-lives/",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"9 others.”19 encompassing responses by governments, companies, celebrities and Seriously, the fake news is wasting time and money, putting lives at risk.",0,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Confirmation Bias and Invisible Barrier Confirmation Bias, “is a psychological bias that People also tend to interpret position.”20 ambiguous evidence as supporting their existing Additionally, it’s the tendency to interpret ambiguous evidence as supporting an existing position. Discussing Conrmation bias means to explore the dissemination of fake news from the perspective of the individual users. Why does one believe and share fake news? The cognitive process of receiving Exploratory Confirmatory thought.21 information uses two modes: thought and Confirmatory thought is designed to construct justification supporting a specific view.22 point of When people justify the authenticity of information, they are applying Confirmatory thought. We tend to believe what we already know and believe true, and consequently we can support and disseminate fake news if they confirm our beliefs. Because of confirmation bias, we are less sensitive to truthful information.",0,0,0,0,40,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"19 “During This Coronavirus Pandemic, 'Fake News' Is Putting Lives at Risk: UNESCO | | UN News.” UN News, news.un.org/en/story/2020/04/1061592 20 “Confirmation Bias,” Dictionary.com, Dictionary.com, www.dictionary.com/browse/confirmation-bias?s=t. Schneider, ed. by Sandra L.; Shanteau, James (2003). Emerging perspectives on 21 judgment and decision research. Cambridge [u.a.]: Cambridge Univ. Press. pp. 438–9. ISBN 052152718X. 22 Ibid.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"10 Another concept that helps explain our bias is wishful thinking and the limited human capacity to process information.23 Wishful thinking is particularly evident in decision making processes: we choose the information that is the easiest to understand, that reinforce our benefit, or follow our belief.",0,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Language barrier is a figurative phrase used primarily to refer to linguistic barriers to communication, which became particularly evident during the 2020 Covid19 pandemic. As the Internet community becomes global, language barriers play a fundamental role in how we process information. As testified by Confirmation bias, individuals appear to prefer receiving information in the language they are familiar with. It takes extra energy to understand the meaning of a message in a foreigner language, especially beyond superficial understanding. Consequently, it’s common for readers to isolate themselves from information in foreign languages. For example, English-speaking users feel quite intimidated when they are using chinese social media like Weibo. Weibo is one of the main media in Chinese-speaking world, it functions both as social media and a news outlet for official media. At present, the amount of monthly active users in Weibo has reached 516 million, most of the users receive news from the hot topic posts.24 hashtags and users’ Despite being no Firewall, information on Weibo has",0,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"*Mahoney, Michael J.; DeMonbreun, B.G. (1977), ""Psychology of the scientist: An 23 analysis of problem-solving bias"", Cognitive Therapy and Research, 1 (3): 229–38, doi:10.1007/BF01186796 “2019 Weibo user development report.” 24 https://www.google.com/search?client=firefox-b-1-d&q=2019%E5%BE%AE%E5%8D%9 A%E7%94%A8%E6%88%B7%E5%8F%91%E5%B1%95%E6%8A%A5%E5%91%8A 11 been ignored by the western world. News from Weibo is seldom showing on Apple News nor any English-based news platform. The phenomenon is not better when people who are out of English-speaking world search for information worldwide. The language barrier aggravates the gaps of understanding and recognition, causing stereotypes.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Public Space and Deliberative Democracy Deliberative democracy is a form of democracy in which deliberation is central to decision-making.25 Compared to representative democracy, in which elective representatives hold the power to make a decision for the larger group, deliberative democracy gives the opportunity to participants to have deliberation. Reasonable arguments and diverse points of view are needed in a deliberative democracy system.",0,0,0,0,60,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"When first developed, the Internet was an ideal public open platform to converge many voices equally, an instantiation of Cyber-utopianism, the belief that online emancipatory.26 communication is in itself As Douglas Rushkoff’s states, the Internet “fosters communication, collaboration, sharing, helpfulness, and community (…) The ideas, information, and applications now launching on Web sites around the world capitalize on the transparency, usability, and accessibility",0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"25 Landemore, HÉLÈNE (2017). ""Deliberative Democracy as Open, Not ( Just) Representative Democracy"". Dædalus, the Journal of the American Academy of Arts & Sciences. Stepehn Wilson, “Information Arts (2002)” p. 477 26",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"12 deliver.”27 that the internet was born to In a public space, opinion and comments are equally important. The socialits’ nostalgia of Athenian public discourse had a chance to revive virtually, where deliberative democracy could have a space. Below are the characteristics of a deliberative democracy.",0,0,0,0,60,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,● Information: The extent to which participants are given access to reasonably accurate information that they believe to be relevant to the issue ● Substantive balance: The extent to which arguments offered by one side or from one perspective are answered by considerations offered by those who hold other perspectives ● Diversity: The extent to which the major position in the public is represented by participants in the discussion ● Conscientiousness: The extent to which participants sincerely weigh the merits of the arguments ● Equal consideration: The extent to which arguments offered by all participants are considered on the merits regardless of which them”28 participants offer,0,0,0,0,65,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Those essential characteristics breed an environment for high quality discourses among individuals. Only with high quality of communications and interaction,",0,0,0,0,40,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"27 Rushkoff, Douglas (2002). Renaissance Now! Media Ecology and the New Global Narrative. Hampton Press. pp. 26–28. James Fishkin, “When the People speak.” (Oxford: Oxford University Press.) pp. 160f. 28 ISBN 978-0-19-957210-6.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"13 misinformation can be reduced effectively. Hannah Arendt in her philosophical The work, Human Condition, establishes “first, that everything that appears in public can be seen and heard by everybody and has the widest possible publicity. For us, appearance — something that is being seen and heard by others as well as reality.”29 by ourselves — constitutes",0,0,0,0,50,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"However, the dream of Cyber-utopian faded as mass communication developed. Under the current digital environment, the power is the hands of few majorities representing the tech giant companies, influencers with millions of followers, and main-stream media. Corporations often manipulate users for profit. The value of truthfulness.30 information relies more on its ability to ""go viral"" rather than it's While social media offer a space for individuals to express themselves, an unequal relationship between discourse participants is created by the emphasis on followers and impact. The power deriving from access to communication channels has not been equally distributed. The unequal distribution of this power polarizes participants. Thus individual voices are the key to an equal networking world. How could we protect and echo the voice of the minority is an essential question.",0,0,0,0,65,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Literature Review Medium as Fragmented Information Carrier,0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"29 Hannah Arendt, “The Human Condition”(Second ed.)( University of Chicago Press.) ISBN 978-0-226-92457-1. https://www.urbandictionary.com/define.php?term=go%20viral. 30 14 death”31 Published in 1985, the book “Amusing ourselves to discusses the erosive effect of television on our public discourse in America. It investigates what happened in technology, education, society with the subject of entertainment. The writer, Neil Postman also cited from a book called “Brave New World”32, which depicted a future situation with the public power weakened by distractions— entertainment, leisure, and laughter33 to display his concern on the amusing media and content.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Neil Postman compared the different versions from “1984” and “Brave New World”, arguing “what we desire will ruin us.” “Distraction” is the keyword to express the background of powerless public discourse. It is also related to the algorithm that recommends users with what they desire to form filter bubbles. From the television to the algorithm, the comfort zones they provide control the public expression power, because of “man’s almost infinite appetite for 34 distractions.”",40,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"31 Neil Postman, Amusing Ourselves to Death: Public Discourse in the Age of Showbusiness. Methuen, 2007. 32 Aldous Huxley, Brave New World: with the Essay ""Brave New World Revisited"". Harper Perennial, 2010. 33 Dan Silvestre,“Lessons from Amusing Ourselves to Death by Neil Postman.” Medium, Medium, 11 Sept. 2018, medium.com/@dsilvestre/lessons-from-amusing-ourselves-to-death-by-neil-postman-962221ee6 22. 34 Neil Postman, Amusing Ourselves to Death.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"15 day”35, From the book, Neil also brings out a content called ”the news of the describing the fact that new communications technologies have fragmented the information to suit the fragmented conversations between people. Indeed, the fragmented information loses the completeness logically, and will decrease content’s accuracy. In terms of conversation and discourse, Neil Postman compares the television to the conversation carrier. Within the carrier, the truth becomes related to the techniques of communication subjectively. As Neil Postman indicated,”A major new medium changes the structure of communications by creating new forms of truth-telling.” Thus, the carrier or the platform of the content takes significant roles in truth dissemination. For example, in the print era, truth-telling and public discourse was following logical and serious principles. However, the new technology commercialized the discourse to separate context from meanings.",35,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"In sum, with the fragmented information decontextualized by television and other new media now, “the news of the day” represents a message without coherence and logic. Under this climate, how to design new platforms to strengthen the public discourse power is a possible method to defend fragmented and amusing information.",40,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"16 The Mechanism of Serendipity Inspirations could be found in the article“Designing for Unexpected Encounters Experience.”36 with Digital Product: Case Studies of Serendipity as Felt In the article, the writer Rung-Huei Liang discussed how random mechanisms have been employed in the user experience in the digital products. In terms of the “aesthetics of interaction design”, serendipity provides more involvement, experience, and surprise to satisfy users' needs that usability and functionality could not apply. For example, users will choose the random mode when playing music on the player page to gain a sense of novelty even with familiar contents. Rung-Huei Liang stresses that serendipity is not only the consequence of the digital numerous content, but also an essential experiential quality in interaction design. By serendipity, the user would feel involved in the content, and will have a tendency to explore the relationship of unrelated information. Serendipity belongs to implicit interaction to connect unrelated content, which could be applied into the news feed mechanism to break the viewer’s filter bubble.",35,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Some significant elements of framing serendipity in digital product also could be implemented on public discourse platform, including “digital accident” and “sagacious discoveries”These two elements are proposed by André, Schraefel, et al. : the finding of unexpected information (digital accidents) and the making of",30,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"36R. -H Liang, (2012). Designing for unexpected encounters with digital products: Case studies of serendipity as felt experience. International Journal of Design, 6(1), 41-58. 17 discoveries).37 an intellectual leap (sagacious Unexpected information is the metaphor for news feed, and the intellectual leap is the reflection of thinking and consideration facing the news report. In the process that from finding unexpected information to making intellectual leap, public discourses would happen between more participants and are able to construct a rational and open climate.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Designs in the Post-Truth Era (RTD)38 Research Through Design and design thinking processes constitute the primary methodology of this thesis. Design thinking was applied to the explorations of a visual language for this topic and in the process of prototyping ideas. Speculative design was used to explore the potential of fake news in a concept39. process of diverging and converging ideas related to this Each design project has gone through an iterative development process with different versions. During the iterations, I gain a deeper understanding and clarification of the project goal. Those projects’ output heavily relied on the participants’ feedback to provide insights. Context played important roles in the designs in the Post-Truth Era. The titles, the topics, the media, the motives, and the audiences are weaving together to construct the context of misinformation, which inspires",0,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"37 R. -H Liang, (2012). Designing for unexpected encounters with digital products: Case studies of serendipity as felt experience. 38 “Research Through Design.” https://www.researchthroughdesign.org/ “What is Design Thinking?” 39 Tim Brown, https://www.interaction-design.org/literature/topics/design-thinking",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,18 me to investigate more information from it. The diverse contexts of misinformation reveals the possibilities to apply design thinking to investigate.,0,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"News Flashlight is a 60-days project including a satire website and a publication output to explore fake news visual language. The project uses a newspaper layout containing 60 fake news reporting styles. The project lasted for 8 weeks. From the research, I conclude and categorize the templates of typical fake news visual language as different topics, such as “source agnostic”,” Half real, half fake”, ”Breaking headline”, and etc. The 60 projects are shaped by those topics and News apply the template into some latest news then. Thus, the vibe of the Flashlight is ironic and satirical. Applying critical and creative thinking is a method to understand, visualize, and describe the complexity of fake news to reduce them.",0,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,60-days Figure 1: Project “News Flashlight” contains different kinds of fake news investigation.,0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"19 DAILY NEWS is a cultural probe used to research a target audience's perception of fake news in a daily context. The project aims to understand the users’ subjective attitudes on controversial topics. Emoji and degrees of recognition reflect essential parts of viewers’ attitudes on fake news topics. Whether the choice of emoji and comments from one person on the same topic reflects the consistency of their attitude or not is the research goal. The participants are asked to fill out two questionnaires that describe one topic content in different expressions. Then, the participants are asked to use emoji and the number which represent the degrees of recognition to fill their comments separately. The topic is the quantitative, their reflections are the variables. Showing interesting results, the research output indicates that people using emojis with vague meanings display less consistency on their attitudes.",0,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Figure 2: Cultural Probe questionnaire parts and collected information.,0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,The result of the cultural probe informed the JOINTER project: a design response to the concept of visceral thinking and behavioral reflections. JOINTER,0,0,0,0,25,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"20 is a fake news generator app that enables users to collage symbolic elements to fabricate fake news within minutes. A satirical response arguing that the cost of fabricating fake news is low, thus judging the authenticity of a piece of news is the crucial step to reduce fake news. In this project, viewing fake news as a part of a larger system of disinformation, rather than an independent issue.",0,0,0,0,30,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,Figure 3: Fake news generator App pages layout.,0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Fragmented Reflection is a speculative design idea for an interactive exhibition exploring confirmation bias and isolation. The installation is constructed by a circular mirror folding upward to the structure and portraying content on the top of it. Participants perceive the content/image through the mirror, creating their own narrative from the fragmented part. This is the metaphor of the post-truth era, in which people are convinced by the fragment of a whole issue.",35,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,21 Figure 4: Fragmented Reflection is a speculative space installation.,0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"As serendipity becomes the keyword of my capstone project, SEEMS explores how to generate discussions among users from different backgrounds and aims to decrease the polarizing tendency of digital environments. Fake news is one of the most disputed issues in online discussions. Personalized news feed and personal confirmation bias, transform opinions into potential conflict, rather than supporting an open dialogue. Dialogue is needed to construct deliberative democracy. Spaces for open dialogue need to build on respectful climate, enabling individuals to interact with a larger group of people, and thus Architecture encountering diverse perspectives. By creating an of Serendipity the discussion can be fostered. Architecture of Serendipity is a system or common space to encourage people to mingle together. “Serendipity is also seen as a potential design principle for",0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"22 online activities that would present a wide array of information and viewpoints, rather than just re-enforcing a user's opinion.”40",0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,This project explores how to apply the idea of serendipity in a design artifact that distances itself from personalized content and platforms. It aims to stimulate the player’s habit to break their echo chamber and be interested in others perspectives. The project imagines a design instantiation of the principle of deliberative democracy.,35,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"SEEMS is a multiple-ending interactive video. Inspired by “Black Mirror: Bandersnatch,”4142 SEEMS is a choose-your-own-adventure story in which the users uncover the endings for themselves. The interactive video presents parallel endings that depend on participants’ choice. In the video, the structure branches the plot and lets the audience decide the narrative on their own. The viewer creates their own narratives based on their bias, interests, and emotions. They have the chance to restart the story and explore other paths. By restarting, serendipity is put into play, as other perspectives generate alternatives, formally",30,0,0,0,40,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Urbano Reviglio, Serendipity by Design? How to Turn from Diversity Exposure to 40 Diversity Experience to Face Filter Bubbles in Social Media, Internet Science: 4th International Conference, INSCI 2017, Thessaloniki, Greece, November 22-24, 2017, Proceedings (pp.281-300) “Black Mirror: Bandersnatch.” https://www.netflix.com/title/80988062 41 42Jackie Strause, 'Black Mirror' Bosses Unpack the Multiple 'Bandersnatch' Endings https://www.hollywoodreporter.com/live-feed/black-mirror-bandersnatch-endings-explain ed-1171556 23 questioning a single narrative approach.This multi-paths design has implications for Internet product designers. The possibilities that algorithms provide are not only in convenience but also in diversity. Dissolving users’ filter bubbles is a long-term design process, whose paths are necessary in the post-truth era.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Conclusions Fake news is not a new issue for the publishing industry; historian Yuval Noah Harari states the evidence that humans are the only mammals inventing fictional survive.43 stories to cooperate with each other to In “The Role of Emotion in the Dissemination of ‘Fake News’ Axel Bruns explains ""Online (Mis)information may be assessed for its level of facticity, its intention misleading information created 44 or disseminated without manipulative or malicious intent.“ and this constructs my research area of context.",0,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"We are encountering a greater and greater volume of fake news today due to the unprecedented shifts in communication technologies. We are in the post-truth era, where objective facts are less influential in shaping public opinion than appeals to emotion and personal belief. When judging the authenticity of a piece of news, confirmation biases influence our attitude. “Subjective truth is a truth based on a person's perspective, feelings, or opinions. Everything we know is",0,0,0,0,45,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"43 Yuval Noah Harari, “Cover of Sapiens: A Brief History of Humankind, Chapter two: ISBN 9780099590088.” THE TREE OF KNOWLEDGE.” 44 “Joneralism, Fake news, and disinformation”(United Nations Educational, Scientific and Cultural Organization, 2018)",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"24 based on our input - our senses, our perception. Thus, everything we know is subjective. All truths are subjective.” 45When discussing the authenticity of the news, our confirmation bias will lead us to the subjective truth we believe. Users' identities, including their interests, backgrounds, political stances are reflected in their understanding of truth. When discussing the authenticity of the news, our confirmation bias will lead us to the subjective truth we believe. Truth becomes Subjective Truth: “a truth based on a person's perspective, feelings, or opinions. Everything we know is based on our input - our senses, our perception. Thus, subjective.”46 everything we know is subjective. All truths are",0,0,0,0,35,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Users’ cognitions are reflected in their behaviors. Algorithms use those behaviors to provide a personalized service. This personalization builds a space that traps users into a singular perspective, refusing the different ideas and hindering dialogue. News feeds create a negative loop, wrapping users in their own bias. When considering the issue from the perspective of psychology, it becomes clear that users' confirmation bias influences their attitude to judge news and prevent them from needing to double check the truth. The type of content a user might read, encounter, or disseminate online is a reflection of that individual's core Echo beliefs, social values, and orientation. User’s experience an Chamber “an environment in which a person encounters only beliefs or opinions that coincide",0,0,0,0,55,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"45 Charles Taliaferro, http://www.askphilosophers.org/question/4316 46 Ibid.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"25 with their own so that their existing views are reinforced and alternative ideas are Filter not considered.”47 The echo chamber can is often referred as Bubble: a term formulated by Eli Pariser, “a situation in which an Internet user encounters only information and opinions that conform to and reinforce their own beliefs, caused experience.”48 by algorithms that personalize an individual’s online",0,0,0,0,50,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"The architecture of online content manipulates users to receive content in an effective but monotonous way.49 When news is communicated in a vehement, direct and confirmative way, the receiver's sensitivity to authenticity is weakened. Stakeholders have contributed some effort to minimize fake content on the internet. Nowadays, technology companies, like Facebook and Google, have designed some products, collaborating with their users to control the source of fake news on their platform. Their claims to be fighting against misinformation. In “The Role of Emotion in the Dissemination of ‘Fake News’ Axel Bruns explains “Online (Mis)information may be assessed for its level of facticity, its intention misleading information created or disseminated without manipulative or 50 malicious intent.”",35,0,0,0,50,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Huffington Post, “The Huffington Post ""Are Filter-bubbles Shrinking Our Minds?"" (the 47 Wayback Machine, 2016). Eli Pariser, https://www.lexico.com/en/definition/filter_bubble. 48 49 Cass Sunstein, “Republic: Divided Democracy in the Age of Social Media.” (Princeton University Press, 2017), ISBN-10: 0691175519. 50 “Joneralism, Fake news, and disinformation”(United Nations Educational, Scientific and Cultural Organization, 2018).",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"26 Architecture The idea of of serendipity can be used to ease this issue. Created by Jane Jacob, it describes a public space that can promote serendipity between people.51 different groups of This concept is relevant to the digital world, as it introduces a dissemination mechanism that is no longer governed by a data.52 recommendation system or Unique Visitors Users can break down their confirmation bias and escape the homogeneous group to embrace communication diversity. Additionally, users’ communication with each other plays an extensive role in breaking filter bubbles. In the process of discourse, deliberation, and debate, users’ decision-making would probably be reformed by other perspectives, becoming more rational, flexible, and open. Design is a central component to construct this change. The projects described above all aime to rebuild a dialogue between users on the Internet and combat disinformation. This thesis argues that to reduce fake news we should render the idea of truth as a big picture made of many pieces of a puzzle.",30,0,0,0,55,20,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"The Internet is a virtual public space. The intention to design the public space is to embrace the truth and diversity. In this public space dialogue is a powerful tool minimize polarization. to release users from their filter bubble and ideological During a discussion, participants have the opportunity to extend their perspectives if consideration and respect exist. Dialogue could happen on target",0,0,0,0,60,25,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Cass Sunstein, “Republic: Divided Democracy in the Age of Social Media.” 51 FABC Web Standards Archived September 11, 2010. 52 27 immediately subjects or randomly selected users, and could take place or asynchronously. However, the more serendipity users will encounter, the less dense their filter bubbles would be. Truth is a multiple-ending narrative to be pieced together.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"---.""Explained: What is Fake news? | Social Media and Filter Bubbles"". Webwise.ie. June 21, 2018. Retrieved March 25, 2019. Harari, Yuval Noah.“Cover of Sapiens: A Brief History of Humankind, Chapter ISBN two: THE TREE OF KNOWLEDGE.” 9780099590088. Hosanagar, Kartik (2016-11-25). ""Blame the Echo Chamber on Facebook. But Blame Yourself, Too"".Wired.com. Retrieved 2017-09-24.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Hunt, Elle ""What is fake news? How to spot it and what you can do to stop it"". The Guardian. Retrieved January 15, 2017. Brave Huxley, Aldous. New World: with the Essay ""Brave New World Revisited"". Harper Perennial, 2010. James, Meredith. “The Role of Ethics Online and Among Social Media Designers.” 2017. https://pdxscholar.library.pdx.edu/artdesign_fac/6/. Lapidot-Lefler, Noam; Barak, Azy (2012). ""Effects of anonymity, invisibility, and lack of eye-contact on toxic online disinhibition"". Computers in Human Behavior. 28 (2): 434–443. doi:10.1016/j.chb.2011.10.014. Liang, R. -H. (2012). Designing for unexpected encounters with digital products: Case studies of serendipity as felt experience. International Journal of Design, 6(1), 41-58.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"29 Mahoney, Michael J.; DeMonbreun, B.G.”Analysis of Problem-Solving Bias"", Cognitive (1977), ""Psychology of the Scientist: AnTherapy and Research, 1 (3): 229–38, doi:10.1007/BF01186796. ""News Use Across Social Media Platforms 2016 | Pew Research Center"". May 26, 2016. Retrieved March 6, 2019. Amusing Postman, Neil. Ourselves to Death: Public Discourse in the Age of Showbusiness. Methuen, 2007. Shanteau, James (2003), Sandra L. Schneider (ed.), Emerging perspectives on judgment and decision research, Cambridge[u. a.]: Cambridge University Press. Sunstein, Cass. “Republic: Divided Democracy in the Age of Social Media.” Princeton University Press, 2017). ISBN-10: 0691175519.",0,0,0,0,0,0,0
+Xinyue Nie,"Post-Truth Era, Polarization, and Discourse by Serendipity",thesis,"Terry, Christopher, Jeff Cain (May 2016). ""The Emerging Issue of Digital Empathy"". American Journal of Pharmaceutical Education. 80 (4): 58. doi:10.5688/.",0,0,0,0,0,0,0
+`; // end of EMBEDDED_CSV
+
+/* ═══════════════════════════════════════════════════════════
+   COLOR SYSTEM
+   ═══════════════════════════════════════════════════════════ */
+const PLO_COLORS = {
+  plo1: '#4e8a62',   // green  — Environmental
+  plo2: '#4872a4',   // blue   — Material
+  plo3: '#b05c3a',   // terracotta — Equity
+  plo4: '#7659a0'    // purple — Systems
+};
+
+function ploColor(ploId) { return PLO_COLORS[ploId] || '#888'; }
+
+function nodeColor(d) {
+  if (d.type === 'plo') return PLO_COLORS[d.id] || '#888';
+  const primaryPlo = (d.plos && d.plos[0]) || 'plo1';
+  const base = d3.color(PLO_COLORS[primaryPlo] || '#888');
+  if (d.type === 'class')         return d3.interpolateRgb(base, '#777')(0.3);
+  if (d.type === 'manifestation') return d3.interpolateRgb(base, '#fff')(0.35);
+  return '#888';
+}
+
+// Artifact color: a slightly brighter version of their class's program color
+const CLASS_COLORS = {};
+function initClassColors() {
+  PROGRAM_DATA.classes.forEach(c => {
+    const primaryPlo = c.plos[0];
+    const base = d3.color(PLO_COLORS[primaryPlo] || '#888');
+    CLASS_COLORS[c.id] = d3.interpolateRgb(base, '#fff')(0.15);
+  });
+}
+
+function classColor(classId) { return CLASS_COLORS[classId] || '#888'; }
+
+function nodeRadius(d) {
+  if (d.type === 'plo')           return 28;
+  if (d.type === 'class')         return 18;
+  if (d.type === 'manifestation') return 13;
+  return 7;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+const state = {
+  visibleClasses:        new Set(PROGRAM_DATA.classes.map(c => c.id)),
+  visibleAuthors:        new Set(),
+  allArtifacts:          [],
+  activeManifestationId: null   // ID of currently pinned manifestation, or null
+};
+
+// D3 globals
+let svg, svgWidth, svgHeight;
+let sim1, sim2;
+let progLinkSel, progNodeSel, artNodeSel;
+let _programNodes = [], _programLinks = [], _manifestationNodes = [];
+let _artifactNodes = [];
+
+/* ═══════════════════════════════════════════════════════════
+   DATA PROCESSING
+   ═══════════════════════════════════════════════════════════ */
+const SCORE_COLS = [
+  'score_slowness','score_material','score_environmental_crisis',
+  'score_natural_world','score_equitable_design','score_stewardship',
+  'score_more_than_human'
+];
+const REQUIRED_COLS = ['author','thesis_title','class','paragraph',...SCORE_COLS];
+
+function processData(rows, merge = false) {
+  const coerced = rows.map((r, i) => {
+    const a = { ...r, _uid: merge ? state.allArtifacts.length + i : i };
+    SCORE_COLS.forEach(col => { a[col] = +(r[col]) || 0; });
+    return a;
+  });
+
+  if (merge) {
+    // Deduplicate by author + paragraph prefix
+    const existing = new Set(
+      state.allArtifacts.map(a => `${a.author}||${a.paragraph.slice(0,60)}`)
+    );
+    const fresh = coerced.filter(a =>
+      !existing.has(`${a.author}||${a.paragraph.slice(0,60)}`)
+    );
+    state.allArtifacts = [...state.allArtifacts, ...fresh];
+    fresh.forEach(a => state.visibleAuthors.add(a.author));
+    // Add any new classes to visible set
+    fresh.forEach(a => { if (a.class) state.visibleClasses.add(a.class); });
+  } else {
+    state.allArtifacts = coerced;
+    const authors = [...new Set(coerced.map(a => a.author))];
+    authors.forEach(a => state.visibleAuthors.add(a));
+  }
+}
+
+function getVisibleArtifacts() {
+  return state.allArtifacts.filter(a =>
+    state.visibleClasses.has(a.class) &&
+    state.visibleAuthors.has(a.author)
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SVG FILTERS
+   ═══════════════════════════════════════════════════════════ */
+function addSvgFilters() {
+  const defs = svg.append('defs');
+  const f = defs.append('filter').attr('id', 'node-shadow')
+    .attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  f.append('feDropShadow')
+    .attr('dx', 0).attr('dy', 1)
+    .attr('stdDeviation', 3)
+    .attr('flood-color', 'rgba(0,0,0,0.18)');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SVG SETUP
+   ═══════════════════════════════════════════════════════════ */
+function setupSVG() {
+  const wrap = document.getElementById('canvas-wrap');
+  svgWidth  = wrap.clientWidth;
+  svgHeight = wrap.clientHeight;
+
+  svg = d3.select('#main-svg')
+    .attr('width', svgWidth)
+    .attr('height', svgHeight);
+
+  svg.append('g').attr('id', 'layer-prog-links');
+  svg.append('g').attr('id', 'layer-art-nodes');   // artifacts UNDER program nodes
+  svg.append('g').attr('id', 'layer-prog-nodes');   // program nodes always on top
+  svg.append('g').attr('id', 'layer-legend');
+
+  // Click/tap on empty canvas clears any active manifestation highlight
+  svg.on('click.clearHighlight touchend.clearHighlight', (event) => {
+    if (event.target === svg.node()) clearManifestationHighlight();
+  });
+
+  // Resize observer — re-pin PLOs to new quadrant positions on resize
+  new ResizeObserver(() => {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
+    svgWidth = w; svgHeight = h;
+    svg.attr('width', svgWidth).attr('height', svgHeight);
+    if (sim1) {
+      sim1.nodes()
+        .filter(n => n.type === 'plo')
+        .forEach(n => {
+          const pos = ploQuadrantPos(n.id);
+          n.fx = pos.x; n.fy = pos.y;
+          n.x  = pos.x; n.y  = pos.y;
+        });
+      sim1.alpha(0.2).restart();
+    }
+    renderLegend(); // legend is positioned relative to svgWidth
+  }).observe(wrap);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM FORCES
+   ═══════════════════════════════════════════════════════════ */
+// Soft boundary repulsion — keeps nodes from going off-screen
+// Uses initialize() so nodes are captured properly (no `this` dependency)
+function boundaryForce(getWidth, getHeight, padding) {
+  let _nodes = [];
+  function force(alpha) {
+    const W = getWidth(), H = getHeight();
+    const strength = 0.18 * alpha;
+    _nodes.forEach(n => {
+      const r = (n.type ? nodeRadius(n) : 8) + padding;
+      if (n.x < r)       n.vx += (r - n.x) * strength;
+      if (n.x > W - r)   n.vx -= (n.x - (W - r)) * strength;
+      if (n.y < r)       n.vy += (r - n.y) * strength;
+      if (n.y > H - r)   n.vy -= (n.y - (H - r)) * strength;
+    });
+  }
+  force.initialize = function(nodes) { _nodes = nodes; };
+  return force;
+}
+
+function customAttractionForce(manifestationNodes) {
+  let _nodes = [];
+  function force(alpha) {
+    const ATTRACT_K = 0.18 * Math.min(1, (svgWidth * svgHeight) / (900 * 600));
+    _nodes.forEach(artifact => {
+      let totalScore = 0;
+      manifestationNodes.forEach(m => { totalScore += artifact[m.id] || 0; });
+
+      manifestationNodes.forEach(mNode => {
+        if (mNode.x == null || mNode.y == null) return;
+        const score = artifact[mNode.id] || 0;
+        if (score <= 0) return;
+
+        const weight  = score / 100;
+        const weight2 = weight * weight;  // squared curve: high scores pull much harder
+
+        const dx   = mNode.x - artifact.x;
+        const dy   = mNode.y - artifact.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        // Target orbit distance — high scorers pulled tight, low scorers loosely nudged
+        // score=100 → ~10px, score=70 → ~14px, score=50 → ~22px, score=20 → ~42px
+        const targetDist = 5 + 40 * (1 - weight) * (1 - weight);
+
+        // Spring: positive tension pulls in, negative pushes out (orbit at targetDist)
+        const tension = (dist - targetDist) / dist;
+
+        const s = tension * weight2 * ATTRACT_K * alpha;
+        artifact.vx += dx * s;
+        artifact.vy += dy * s;
+      });
+
+      // Artifacts with no scores at all: gentle pull toward canvas center
+      if (totalScore === 0) {
+        const cx = svgWidth * 0.5, cy = svgHeight * 0.5;
+        artifact.vx += (cx - artifact.x) * 0.002 * alpha;
+        artifact.vy += (cy - artifact.y) * 0.002 * alpha;
+      }
+    });
+  }
+  force.initialize = function(nodes) { _nodes = nodes; };
+  return force;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PLO QUADRANT POSITIONS — computed from current viewport
+   ═══════════════════════════════════════════════════════════ */
+const PLO_OFFSETS = { plo1: [-1,-1], plo2: [1,-1], plo3: [-1,1], plo4: [1,1] };
+
+function ploQuadrantPos(ploId) {
+  // Program graph lives in left ~38% of canvas, vertically centred
+  const cx = svgWidth  * 0.28;
+  const cy = svgHeight * 0.50;
+  const rx = Math.min(svgWidth  * 0.16, 130); // horizontal radius
+  const ry = Math.min(svgHeight * 0.28, 150); // vertical radius
+  const o  = PLO_OFFSETS[ploId];
+  if (!o) return { x: cx, y: cy };
+  return { x: cx + o[0] * rx, y: cy + o[1] * ry };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 1 — Program Graph
+   PLOs are PINNED at quadrant positions (fx/fy).
+   Classes and Manifestations float around them via force.
+   ═══════════════════════════════════════════════════════════ */
+function buildProgramSimulation(visibleClasses) {
+  const ploNodes = PROGRAM_DATA.plos.map(p => ({ ...p, type: 'plo' }));
+  const classNodes = PROGRAM_DATA.classes
+    .filter(c => visibleClasses.has(c.id))
+    .map(c => ({ ...c, type: 'class' }));
+  const manifestationNodes = PROGRAM_DATA.manifestations
+    .filter(m => m.classes.some(cid => visibleClasses.has(cid)))
+    .map(m => ({ ...m, type: 'manifestation' }));
+
+  const nodes = [...ploNodes, ...classNodes, ...manifestationNodes];
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+  // ── Pin PLO nodes to quadrant positions ──────────────────
+  ploNodes.forEach(n => {
+    const pos = ploQuadrantPos(n.id);
+    n.x  = pos.x;  n.y  = pos.y;
+    n.fx = pos.x;  n.fy = pos.y;  // pinned — drag releases these
+  });
+
+  const links = [];
+  classNodes.forEach(c =>
+    c.plos.forEach(pid => {
+      const src = nodeById.get(pid);
+      if (src) links.push({ source: src, target: c, linkType: 'class' });
+    })
+  );
+  manifestationNodes.forEach(m =>
+    m.classes.forEach(cid => {
+      const src = nodeById.get(cid);
+      if (src) links.push({ source: src, target: m, linkType: 'manifestation' });
+    })
+  );
+
+  // Helper: spawn position = centroid of a node's linked PLOs + small jitter
+  function centroidSpawn(ploIds) {
+    const positions = (ploIds || ['plo1']).map(pid => ploQuadrantPos(pid));
+    const ax = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const ay = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    return {
+      x: ax + (Math.random() - 0.5) * 28,
+      y: ay + (Math.random() - 0.5) * 28
+    };
+  }
+
+  // Preserve positions for non-PLO nodes that already existed
+  if (sim1) {
+    const oldById = new Map(sim1.nodes().filter(n => n.type !== 'plo').map(n => [n.id, n]));
+    [...classNodes, ...manifestationNodes].forEach(n => {
+      const old = oldById.get(n.id);
+      if (old) { n.x = old.x; n.y = old.y; n.vx = old.vx || 0; n.vy = old.vy || 0; }
+      else {
+        const sp = centroidSpawn(n.plos);
+        n.x = sp.x; n.y = sp.y;
+      }
+    });
+  } else {
+    // First build — spawn each node near centroid of its linked PLOs
+    [...classNodes, ...manifestationNodes].forEach(n => {
+      const sp = centroidSpawn(n.plos);
+      n.x = sp.x; n.y = sp.y;
+    });
+  }
+
+  if (sim1) sim1.stop();
+
+  // Link distance scales with viewport
+  const vscale = Math.min(svgWidth, svgHeight) / 600;
+  const classDist    = Math.max(50, Math.min(100, 90 * vscale));
+  const manifestDist = Math.max(35, Math.min(70,  65 * vscale));
+
+  sim1 = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links)
+      .id(d => d.id)
+      .distance(d => d.linkType === 'class' ? classDist : manifestDist)
+      .strength(d => d.linkType === 'class' ? 0.7 : 0.6))
+    .force('charge', d3.forceManyBody()
+      // PLOs are pinned so charge only matters for classes/manifestations
+      .strength(d => d.type === 'class' ? -60 : d.type === 'manifestation' ? -40 : 0))
+    .force('collide', d3.forceCollide()
+      .radius(d => nodeRadius(d) + 6)
+      .strength(0.8))
+    .force('boundary', boundaryForce(() => svgWidth, () => svgHeight, 10))
+    .alphaDecay(0.02)
+    .velocityDecay(0.45)
+    .stop()   // prevent auto-start; caller is responsible for starting
+    .on('tick', onTick);
+
+  return { nodes, links, manifestationNodes };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 2 — Artifacts
+   ═══════════════════════════════════════════════════════════ */
+function topManifestationFor(artifact, manifestationNodes) {
+  let best = null, bestScore = -1;
+  manifestationNodes.forEach(m => {
+    const s = artifact[m.id] || 0;
+    if (s > bestScore) { bestScore = s; best = m; }
+  });
+  return best;
+}
+
+function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
+  const oldById = sim2
+    ? new Map(sim2.nodes().map(n => [n._uid, { x: n.x, y: n.y, vx: n.vx, vy: n.vy }]))
+    : new Map();
+
+  visibleArtifacts.forEach(a => {
+    const old = oldById.get(a._uid);
+    if (old) {
+      a.x = old.x; a.y = old.y; a.vx = old.vx; a.vy = old.vy;
+    } else {
+      const top = topManifestationFor(a, manifestationNodes);
+      // Use manifestation's current position if available; otherwise scatter in right half
+      const bx = (top?.x != null && top.x > 10) ? top.x : svgWidth * 0.6 + Math.random() * svgWidth * 0.3;
+      const by = (top?.y != null) ? top.y : svgHeight * 0.2 + Math.random() * svgHeight * 0.6;
+      a.x = bx + (Math.random() - 0.5) * 60;
+      a.y = by + (Math.random() - 0.5) * 60;
+    }
+  });
+
+  if (sim2) sim2.stop();
+
+  sim2 = d3.forceSimulation(visibleArtifacts)
+    .force('attract',   customAttractionForce(manifestationNodes))
+    .force('collide',   d3.forceCollide(5).strength(0.75))
+    .force('charge',    d3.forceManyBody().strength(-2))
+    .force('boundary',  boundaryForce(() => svgWidth, () => svgHeight, 10))
+    .alphaDecay(0.012)
+    .velocityDecay(0.4)
+    .stop()   // prevent auto-start; caller starts it
+    .on('tick', onTick);
+
+  return sim2;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TICK HANDLER
+   ═══════════════════════════════════════════════════════════ */
+function onTick() {
+  if (progLinkSel) {
+    progLinkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  }
+  if (progNodeSel) {
+    progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+  if (artNodeSel) {
+    artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DRAG
+   ═══════════════════════════════════════════════════════════ */
+function makeDrag(simulation) {
+  return d3.drag()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.2).restart();
+      if (sim2) sim2.alphaTarget(0.3).restart();
+      d.fx = d.x; d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x; d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      if (sim2) sim2.alphaTarget(0);
+      // PLO nodes: re-pin at new dragged position; others: release
+      if (d.type !== 'plo') {
+        d.fx = null; d.fy = null;
+      }
+      // (PLO keeps d.fx = event.x from drag move — stays pinned where dropped)
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderAll() {
+  // ── Program Links ──────────────────────────────────────────
+  progLinkSel = svg.select('#layer-prog-links')
+    .selectAll('line.prog-link')
+    .data(_programLinks, d => `${d.source.id}--${d.target.id}`)
+    .join(
+      enter => enter.append('line')
+        .attr('class', 'prog-link')
+        .attr('stroke', d => nodeColor(d.source))
+        .attr('stroke-opacity', 0.25)
+        .attr('stroke-width', d => d.linkType === 'class' ? 1.5 : 1),
+      update => update,
+      exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
+    );
+
+  // ── Program Nodes ──────────────────────────────────────────
+  progNodeSel = svg.select('#layer-prog-nodes')
+    .selectAll('g.prog-node')
+    .data(_programNodes, d => d.id)
+    .join(
+      enter => {
+        const g = enter.append('g')
+          .attr('class', 'prog-node')
+          .style('cursor', 'grab')
+          .call(makeDrag(sim1));
+
+        g.append('circle')
+          .attr('r', d => nodeRadius(d))
+          .attr('fill', d => nodeColor(d))
+          .attr('fill-opacity', d => d.type === 'plo' ? 1 : 0.92)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', d => d.type === 'plo' ? 3 : 2)
+          .attr('filter', 'url(#node-shadow)');
+
+        // PLO label — short abbreviation inside circle
+        g.filter(d => d.type === 'plo')
+          .append('text')
+          .attr('class', 'prog-label')
+          .attr('font-size', '8.5px')
+          .attr('font-weight', '600')
+          .attr('fill', '#fff')
+          .text(d => d.id.toUpperCase());
+
+        // Class label — small text below circle with subtle background
+        g.filter(d => d.type === 'class')
+          .append('text')
+          .attr('class', 'prog-label')
+          .attr('font-size', '7.5px')
+          .attr('font-weight', '500')
+          .attr('fill', '#222')
+          .attr('dy', d => nodeRadius(d) + 10)
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(250,249,245,0.85)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
+
+        // Manifestation label — italic, smaller
+        g.filter(d => d.type === 'manifestation')
+          .append('text')
+          .attr('class', 'prog-label')
+          .attr('font-size', '6.5px')
+          .attr('fill', '#444')
+          .attr('dy', d => nodeRadius(d) + 9)
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(250,249,245,0.85)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .text(d => d.title.length > 16 ? d.title.slice(0, 14) + '…' : d.title);
+
+        g.on('mouseover', showProgramTooltip)
+         .on('mouseleave', hideTooltip);
+
+        // Manifestation tap/click — toggle artifact highlight
+        g.filter(d => d.type === 'manifestation')
+          .style('cursor', 'pointer')
+          .on('click.highlight touchend.highlight', (event, d) => {
+            event.stopPropagation();
+            if (state.activeManifestationId === d.id) {
+              clearManifestationHighlight();
+            } else {
+              highlightArtifactsForManifestation(d.id);
+            }
+          });
+
+        return g;
+      },
+      update => {
+        update.select('circle')
+          .attr('r', d => nodeRadius(d))
+          .attr('fill', d => nodeColor(d));
+        return update;
+      },
+      exit => exit.transition().duration(250).attr('opacity', 0).remove()
+    );
+
+  renderArtifactNodes();
+  renderLegend();
+  updateArtifactCount();
+}
+
+function renderArtifactNodes() {
+  artNodeSel = svg.select('#layer-art-nodes')
+    .selectAll('circle.artifact')
+    .data(_artifactNodes, d => d._uid)
+    .join(
+      enter => enter.append('circle')
+        .attr('class', 'artifact')
+        .attr('r', 3.5)
+        .attr('fill', d => classColor(d.class))
+        .attr('fill-opacity', 0.7)
+        .attr('stroke', 'none')
+        .attr('cx', d => d.x || svgWidth * 0.65)
+        .attr('cy', d => d.y || svgHeight / 2)
+        .on('mouseover', showArtifactTooltip)
+        .on('mouseleave', (event, d) => {
+          if (state.activeManifestationId) {
+            // Restore this artifact to the manifestation-highlight state
+            const mId = state.activeManifestationId;
+            const scored = (d[mId] || 0) > 0;
+            d3.select(event.currentTarget)
+              .attr('r',            scored ? 5    : 3.5)
+              .attr('fill-opacity', scored ? 1    : 0.1)
+              .attr('stroke',       scored ? classColor(d.class) : 'none');
+            // Restore prog nodes to manifestation-highlight state (not full default)
+            d3.selectAll('g.prog-node').select('circle')
+              .attr('fill-opacity', nd => {
+                if (nd.type === 'plo')   return 0.35;
+                if (nd.type === 'class') return 0.2;
+                return nd.id === mId ? 1 : 0.1;
+              })
+              .attr('stroke-width', nd => nd.id === mId ? 4 : nd.type === 'plo' ? 3 : 2);
+          } else {
+            d3.select(event.currentTarget)
+              .attr('r', 3.5)
+              .attr('stroke', 'none')
+              .attr('fill-opacity', 0.7);
+            restoreProgNodes();
+          }
+          hideTooltip();
+        }),
+      update => update.attr('fill', d => classColor(d.class)),
+      exit   => exit.transition().duration(180)
+        .attr('r', 0)
+        .attr('fill-opacity', 0)
+        .remove()
+    );
+}
+
+function renderLegend() {
+  const layer = svg.select('#layer-legend');
+  layer.selectAll('*').remove();
+
+  const classes = PROGRAM_DATA.classes.filter(c => state.visibleClasses.has(c.id));
+  if (!classes.length) return;
+
+  const rowH = 18, padX = 12, padY = 10;
+  const boxH = padY * 2 + classes.length * rowH;
+  const boxW = 170;
+  const bx = svgWidth - boxW - 12;
+  const by = 12;
+
+  layer.append('rect')
+    .attr('x', bx).attr('y', by)
+    .attr('width', boxW).attr('height', boxH)
+    .attr('rx', 6)
+    .attr('fill', 'rgba(250,249,245,0.9)')
+    .attr('stroke', '#e2dfd4')
+    .attr('stroke-width', 1);
+
+  classes.forEach((c, i) => {
+    const gy = by + padY + i * rowH + rowH / 2;
+    layer.append('circle')
+      .attr('cx', bx + padX + 5)
+      .attr('cy', gy)
+      .attr('r', 5)
+      .attr('fill', classColor(c.id))
+      .attr('fill-opacity', 0.85);
+    layer.append('text')
+      .attr('class', 'legend-text')
+      .attr('x', bx + padX + 14)
+      .attr('y', gy)
+      .text(c.title.length > 22 ? c.title.slice(0, 20) + '…' : c.title)
+      .attr('font-size', '9px')
+      .attr('fill', '#141413')
+      .attr('dominant-baseline', 'middle');
+  });
+}
+
+function updateArtifactCount() {
+  document.getElementById('artifact-count').textContent =
+    `${_artifactNodes.length} artifact${_artifactNodes.length !== 1 ? 's' : ''}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION STARTUP
+   Runs a synchronous warm-up so nodes have positions on first
+   paint, then hands off to async requestAnimationFrame ticks.
+   ═══════════════════════════════════════════════════════════ */
+function startSimulations(includeProgram = true) {
+  if (includeProgram) {
+    // Warm-up: run 120 ticks synchronously so positions are set before first paint
+    sim1.alpha(1);
+    for (let i = 0; i < 120; i++) sim1.tick();
+    // Apply positions to DOM immediately
+    if (progLinkSel) {
+      progLinkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    }
+    if (progNodeSel) progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    // Continue async from where warm-up left off
+    sim1.alpha(0.4).restart();
+  }
+
+  // Artifact sim: warm-up then continue async
+  sim2.alpha(1);
+  for (let i = 0; i < 60; i++) sim2.tick();
+  if (artNodeSel) artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  sim2.alpha(0.5).restart();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER ORCHESTRATION
+   ═══════════════════════════════════════════════════════════ */
+function updateFilters(authorOnly = false) {
+  if (!authorOnly) {
+    const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+    _programNodes      = nodes;
+    _programLinks      = links;
+    _manifestationNodes = manifestationNodes;
+  }
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+
+  startSimulations(!authorOnly);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════════════════ */
+function renderSidebar() {
+  renderClassFilters();
+  renderAuthorFilters();
+}
+
+function renderClassFilters() {
+  const container = document.getElementById('class-filters');
+  container.innerHTML = '';
+  PROGRAM_DATA.classes.forEach(c => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.visibleClasses.has(c.id);
+    cb.dataset.classId = c.id;
+    cb.addEventListener('change', e => {
+      if (e.target.checked) state.visibleClasses.add(c.id);
+      else state.visibleClasses.delete(c.id);
+      updateFilters(false);
+    });
+
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.style.background = classColor(c.id);
+
+    const name = document.createElement('span');
+    name.textContent = c.title;
+
+    label.append(cb, swatch, name);
+    container.appendChild(label);
+  });
+}
+
+function renderAuthorFilters() {
+  const container = document.getElementById('author-filters');
+  container.innerHTML = '';
+  const authors = [...new Set(state.allArtifacts.map(a => a.author))].sort();
+  authors.forEach(author => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.visibleAuthors.has(author);
+    cb.dataset.author = author;
+    cb.addEventListener('change', e => {
+      if (e.target.checked) state.visibleAuthors.add(author);
+      else state.visibleAuthors.delete(author);
+      updateFilters(true);
+    });
+
+    const name = document.createElement('span');
+    name.textContent = author;
+
+    label.append(cb, name);
+    container.appendChild(label);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLTIPS
+   ═══════════════════════════════════════════════════════════ */
+const tooltipEl = document.getElementById('tooltip');
+
+function positionTooltip(event) {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const ttW = 290, ttH = tooltipEl.offsetHeight || 180;
+  const margin = 14;
+  let left = event.clientX - rect.left + margin;
+  let top  = event.clientY - rect.top  + margin;
+  if (left + ttW > rect.width  - 6) left = event.clientX - rect.left - ttW - margin;
+  if (top  + ttH > rect.height - 6) top  = event.clientY - rect.top  - ttH - margin;
+  tooltipEl.style.left = Math.max(0, left) + 'px';
+  tooltipEl.style.top  = Math.max(0, top)  + 'px';
+}
+
+function highlightArtifactsForManifestation(mId) {
+  state.activeManifestationId = mId;
+  d3.selectAll('circle.artifact')
+    .attr('r',            d => (d[mId] || 0) > 0 ? 5    : 3.5)
+    .attr('fill-opacity', d => (d[mId] || 0) > 0 ? 1    : 0.1)
+    .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
+    .attr('stroke-width', 1.5);
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', nd => {
+      if (nd.type === 'plo')   return 0.35;
+      if (nd.type === 'class') return 0.2;
+      return nd.id === mId ? 1 : 0.1;
+    })
+    .attr('stroke-width', nd => nd.id === mId ? 4 : nd.type === 'plo' ? 3 : 2);
+}
+
+function clearManifestationHighlight() {
+  state.activeManifestationId = null;
+  d3.selectAll('circle.artifact')
+    .attr('r',            3.5)
+    .attr('fill-opacity', 0.7)
+    .attr('stroke',       'none');
+  restoreProgNodes();
+}
+
+function restoreProgNodes() {
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', nd => nd.type === 'plo' ? 1 : 0.92)
+    .attr('stroke-width', nd => nd.type === 'plo' ? 3 : 2);
+}
+
+function showArtifactTooltip(event, d) {
+  d3.select(event.currentTarget)
+    .attr('r', 5)
+    .attr('stroke', classColor(d.class))
+    .attr('stroke-width', 2)
+    .attr('fill-opacity', 1);
+
+  // Highlight manifestation nodes with a non-zero score; dim everything else
+  const scoredIds = new Set(
+    PROGRAM_DATA.manifestations
+      .filter(m => (d[m.id] || 0) > 0)
+      .map(m => m.id)
+  );
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', nd => {
+      if (nd.type === 'plo') return 0.35;
+      if (nd.type === 'class') return 0.2;
+      return scoredIds.has(nd.id) ? 1 : 0.1;
+    })
+    .attr('stroke-width', nd =>
+      nd.type === 'manifestation' && scoredIds.has(nd.id) ? 4 : nd.type === 'plo' ? 3 : 2
+    );
+
+  const scores = PROGRAM_DATA.manifestations
+    .map(m => ({ title: m.title, score: d[m.id] || 0, color: ploColor(m.plos[0]) }))
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  const excerpt = (d.paragraph || '').trim();
+  const classTitle = PROGRAM_DATA.classes.find(c => c.id === d.class)?.title || d.class;
+
+  tooltipEl.innerHTML = `
+    <div class="tt-title">${d.author}</div>
+    <div class="tt-meta">${classTitle} &nbsp;·&nbsp; ${d.thesis_title}</div>
+    <hr class="tt-divider">
+    <div class="tt-excerpt">${excerpt}</div>
+    ${scores.length ? `
+      <hr class="tt-divider">
+      <div class="tt-scores-label">Top Manifestation Scores</div>
+      ${scores.map(s => `
+        <div class="score-row">
+          <span class="score-name">${s.title}</span>
+          <div class="score-track">
+            <div class="score-fill" style="width:${s.score}%;background:${s.color}"></div>
+          </div>
+          <span class="score-val" style="color:${s.color}">${s.score}</span>
+        </div>`).join('')}` : ''}`;
+
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function showProgramTooltip(event, d) {
+  const typeLabel = { plo: 'Program Learning Outcome', class: 'Class', manifestation: 'Manifestation' }[d.type] || d.type;
+  tooltipEl.innerHTML = `
+    <div class="tt-title">${d.title}</div>
+    <div class="tt-meta">${typeLabel}</div>`;
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILE PICKER
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('csv-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const rows = d3.csvParse(text);
+  if (!rows.length) { alert('CSV appears empty.'); return; }
+
+  const missing = REQUIRED_COLS.filter(c => !(c in rows[0]));
+  if (missing.length) {
+    alert(`CSV is missing required columns:\n${missing.join(', ')}\n\nExpected:\n${REQUIRED_COLS.join(', ')}`);
+    return;
+  }
+
+  processData(rows, true);
+  renderSidebar();
+  updateFilters(false);
+  e.target.value = '';
+});
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+async function init() {
+  initClassColors();
+
+  let csvText = null;
+  try {
+    const res = await fetch('./data/artifacts.csv');
+    if (res.ok) csvText = await res.text();
+  } catch (_) { /* file:// protocol — use embedded */ }
+
+  const rows = d3.csvParse(csvText ?? EMBEDDED_CSV);
+  processData(rows, false);
+
+  setupSVG();
+  addSvgFilters();
+  renderSidebar();
+
+  // Build initial program simulation first, then artifacts
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+  startSimulations();
+}
+
+init();
+</script>
+</body>
+</html>
