@@ -589,8 +589,8 @@ function customAttractionForce(manifestationNodes) {
         const dx = artifact.x - cx;
         const dy = artifact.y - cy;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        artifact.vx += (dx / dist) * 2.0 * alpha;
-        artifact.vy += (dy / dist) * 2.0 * alpha;
+        artifact.vx += (dx / dist) * 10.0 * alpha;
+        artifact.vy += (dy / dist) * 10.0 * alpha;
       }
     });
   }
@@ -792,6 +792,24 @@ function makeDrag(simulation) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ═══════════════════════════════════════════════════════════ */
+// Appends <tspan> children to a single SVG <text> DOM node.
+// lines: string[] — one entry per visual line.
+// lineH: vertical spacing in px between lines.
+// The block is centered vertically around the text element's position.
+function wrapTextLabel(textNode, lines, lineH) {
+  const offsetY = -((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => {
+    const ts = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    ts.setAttribute('x', 0);
+    ts.setAttribute('dy', i === 0 ? offsetY : lineH);
+    ts.textContent = line;
+    textNode.appendChild(ts);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
    RENDER
    ═══════════════════════════════════════════════════════════ */
 function renderAll() {
@@ -829,11 +847,11 @@ function renderAll() {
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
 
-        // Class label — two lines: class code, then full name
+        // Class label — class code on first line, name on second
         g.filter(d => d.type === 'class')
           .append('text')
           .attr('class', 'prog-label prog-label--class')
-          .attr('font-size', '7.5px')
+          .attr('font-size', '9px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
@@ -841,16 +859,23 @@ function renderAll() {
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            const el = d3.select(this);
             const sep = d.title.indexOf(' — ');
             const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
             const name = sep >= 0 ? d.title.slice(sep + 3) : '';
             const r = nodeRadius(d);
-            el.append('tspan').attr('x', 0).attr('dy', r + 10).text(code);
-            if (name) el.append('tspan').attr('x', 0).attr('dy', '1.2em').text(name);
+            const ts1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+            ts1.setAttribute('x', 0); ts1.setAttribute('dy', r + 11);
+            ts1.textContent = code;
+            this.appendChild(ts1);
+            if (name) {
+              const ts2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+              ts2.setAttribute('x', 0); ts2.setAttribute('dy', '1.2em');
+              ts2.textContent = name;
+              this.appendChild(ts2);
+            }
           });
 
-        // Manifestation label — full title, word-wrapped, centered on node point
+        // Manifestation label — single <text> per node, word-wrapped via wrapTextLabel
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
@@ -861,21 +886,10 @@ function renderAll() {
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            const el = d3.select(this);
             const words = d.title.split(' ');
-            const WPL = 4; // words per line
             const lines = [];
-            for (let i = 0; i < words.length; i += WPL) {
-              lines.push(words.slice(i, i + WPL).join(' '));
-            }
-            const lineH = 10; // px, ~1.2em for 8px font
-            const offsetY = -((lines.length - 1) * lineH) / 2;
-            lines.forEach((line, i) => {
-              el.append('tspan')
-                .attr('x', 0)
-                .attr('dy', i === 0 ? offsetY : lineH)
-                .text(line);
-            });
+            for (let i = 0; i < words.length; i += 4) lines.push(words.slice(i, i + 4).join(' '));
+            wrapTextLabel(this, lines, 10);
           });
 
         g.on('mouseover', showProgramTooltip)
