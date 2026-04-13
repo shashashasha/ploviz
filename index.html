@@ -647,7 +647,7 @@ function buildProgramSimulation(visibleClasses) {
       .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
       .strength(d => d.target.classes?.length >= 2 ? 1.0 : 0.4))
     .force('charge', d3.forceManyBody()
-      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -120 : 0))
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -200 : 0))
     // Soft home force — keeps class nodes near their circle positions
     .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
       .strength(d => d.type === 'class' ? 0.06 : 0))
@@ -763,8 +763,8 @@ function renderAll() {
     .join(
       enter => enter.append('line')
         .attr('class', 'prog-link')
-        .attr('stroke', d => nodeColor(d.source))
-        .attr('stroke-opacity', 0.25)
+        .attr('stroke', 'rgba(255,255,255,0.18)')
+        .attr('stroke-opacity', 1)
         .attr('stroke-width', d => d.linkType === 'class' ? 1.5 : 1),
       update => update,
       exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
@@ -785,7 +785,7 @@ function renderAll() {
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
           .attr('fill-opacity', 0.92)
-          .attr('stroke', '#fff')
+          .attr('stroke', d => d.type === 'manifestation' ? '#000' : '#fff')
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
 
@@ -807,7 +807,7 @@ function renderAll() {
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
-          .attr('font-size', '6.5px')
+          .attr('font-size', '8px')
           .attr('fill', '#fff')
           .attr('dy', d => nodeRadius(d) + 9)
           .attr('paint-order', 'stroke')
