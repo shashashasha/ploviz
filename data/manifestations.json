@@ -1,0 +1,192 @@
+{
+  "plo": "PLO 1",
+  "title": "Socio-ecologically sustainable processes",
+  "description": "Apply socio-ecologically sustainable processes and research [to design transformative communication strategies that promote a diverse, equitable, and just society].",
+  "manifestations": [
+    {
+      "id": "M1",
+      "manifestation": "Material considerations and constraints",
+      "classes": ["DES 720A", "DES 741", "DES 751"]
+    },
+    {
+      "id": "M2",
+      "manifestation": "Waste reduction and waste as a design flaw",
+      "classes": ["DES 720A", "DES 720B"]
+    },
+    {
+      "id": "M3",
+      "manifestation": "Mindful material use: ecological sustainability, resource availability, and reducing material overdependence",
+      "classes": ["DES 720A", "DES 720B", "DES 797"]
+    },
+    {
+      "id": "M4",
+      "manifestation": "Environmental awareness and entanglement with ecological systems",
+      "classes": ["DES 720A"]
+    },
+    {
+      "id": "M5",
+      "manifestation": "Underlying principles that inform the work",
+      "classes": ["DES 720A"]
+    },
+    {
+      "id": "M6",
+      "manifestation": "Critical engagement with the ethics of AI",
+      "classes": ["DES 720A"]
+    },
+    {
+      "id": "M7",
+      "manifestation": "Pollution: proposals to reduce harmful manufacturing byproducts; projects that remediate the environment",
+      "classes": ["DES 720B"]
+    },
+    {
+      "id": "M8",
+      "manifestation": "Energy consumption: projects consider the energy consumption of technologies used in making the work",
+      "classes": ["DES 720B"]
+    },
+    {
+      "id": "M9",
+      "manifestation": "Emerging processes: projects research, experiment with, analyze, and/or criticize new manufacturing processes and modes of production",
+      "classes": ["DES 720B"]
+    },
+    {
+      "id": "M10",
+      "manifestation": "History: projects connect to historical ways of being/doing; projects reflect on environmental and/or demographic change over time",
+      "classes": ["DES 720B"]
+    },
+    {
+      "id": "M11",
+      "manifestation": "Slowness (deep listening, sustainable pacing, long-term thinking, somatics)",
+      "classes": ["DES 741", "DES 796"]
+    },
+    {
+      "id": "M12",
+      "manifestation": "Content that engages the current environmental crisis",
+      "classes": ["DES 741"]
+    },
+    {
+      "id": "M13",
+      "manifestation": "Examining our relationship to the natural world",
+      "classes": ["DES 741"]
+    },
+    {
+      "id": "M14",
+      "manifestation": "Design for an equitable and just society",
+      "classes": ["DES 741"]
+    },
+    {
+      "id": "M15",
+      "manifestation": "Care and stewardship for living systems, the environment, and the nonhuman world",
+      "classes": ["DES 741", "DES 796"]
+    },
+    {
+      "id": "M16",
+      "manifestation": "Considering more than human stakeholders (ecosystems, animals, weather systems, materiality)",
+      "classes": ["DES 741", "DES 796"]
+    },
+    {
+      "id": "M17",
+      "manifestation": "DIY ethos",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M18",
+      "manifestation": "Low-cost production",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M19",
+      "manifestation": "Diary and journal-inspired practices",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M20",
+      "manifestation": "Generative methodologies: workshops, annotated collage, and material play",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M21",
+      "manifestation": "Accessibility of knowledge sources",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M22",
+      "manifestation": "Speculative projects as methodologies for interpreting emerging ideas",
+      "classes": ["DES 751"]
+    },
+    {
+      "id": "M23",
+      "manifestation": "Modification to existing service, environment, or artifact that reflects needs of community",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M24",
+      "manifestation": "Preparation of open-ended questions; structured conversation with someone of deep knowledge",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M25",
+      "manifestation": "In-situ, dynamic field research involving a participant",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M26",
+      "manifestation": "Photographs, textures, and video of social rituals as outsider, not insider",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M27",
+      "manifestation": "Unobtrusive interaction or engagement using Spradley's 9 Dimensions",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M28",
+      "manifestation": "Annotations and citations: census data, GIS, academic articles",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M29",
+      "manifestation": "Man-on-the-street vs expert: formal, semi-formal, and informal approaches",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M30",
+      "manifestation": "Observational mapping and behavioral zoning",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M31",
+      "manifestation": "Exploring unfamiliar people and locations to break assumptions",
+      "classes": ["DES 730A/B"]
+    },
+    {
+      "id": "M32",
+      "manifestation": "Material transcendence and explorations of non-materiality",
+      "classes": ["DES 796", "DES 797"]
+    },
+    {
+      "id": "M33",
+      "manifestation": "Resilience (sustained creative engagement, adaptive resilience, reflective practice, ability to work with complexity, capacity to navigate uncertainty, upholding of ethics and integrity)",
+      "classes": ["DES 796", "DES 797"]
+    },
+    {
+      "id": "M34",
+      "manifestation": "Community engagement and collaborative dialogue (co-authorship, co-research, co-leadership)",
+      "classes": ["DES 796", "DES 797"]
+    },
+    {
+      "id": "M35",
+      "manifestation": "Site-specific inquiry (culturally, geographically, ecologically)",
+      "classes": ["DES 796"]
+    },
+    {
+      "id": "M36",
+      "manifestation": "Positionality and students locating themselves as subjects of and within their own work",
+      "classes": ["DES 796"]
+    },
+    {
+      "id": "M37",
+      "manifestation": "Sustained and systematic practice (continued commitment to body of work from Thesis I)",
+      "classes": ["DES 797"]
+    }
+  ]
+}

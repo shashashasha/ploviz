@@ -260,90 +260,111 @@
    PROGRAM STRUCTURE — edit this object to match your program
    ═══════════════════════════════════════════════════════════ */
 const PROGRAM_DATA = {
-  plos: [
-    { id: 'plo1', title: 'PLO 1: Socio-ecologically Sustainable Processes' },
-    { id: 'plo2', title: 'PLO 2: [Placeholder]' },
-    { id: 'plo3', title: 'PLO 3: [Placeholder]' },
-    { id: 'plo4', title: 'PLO 4: [Placeholder]' }
-  ],
-
+  // Classes ordered so related pairs are adjacent on the circle layout —
+  // this places cross-class manifestation nodes naturally between their parents.
   classes: [
-    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',         plos: ['plo1'] },
-    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',         plos: ['plo1'] },
+    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',              plos: ['plo1'] },
+    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',              plos: ['plo1'] },
+    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',         plos: ['plo1'] },
+    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',         plos: ['plo1'] },
+    { id: 'des751',  title: 'DES 751 — Design Writing',                             plos: ['plo1'] },
+    { id: 'des730',  title: 'DES 730A/B — Transformation Design',                   plos: ['plo1'] },
     { id: 'des741',  title: 'DES 741 — Cross-disciplinary Studio: Symbiotic Futures', plos: ['plo1'] },
-    { id: 'des751',  title: 'DES 751 — Design Writing',                        plos: ['plo1'] },
-    { id: 'des730',  title: 'DES 730A/B — Transformation Design',              plos: ['plo1'] },
-    { id: 'des796',  title: 'DES 796 — Thesis I',                              plos: ['plo1'] },
-    { id: 'des797',  title: 'DES 797 — Thesis II',                             plos: ['plo1'] },
-    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',    plos: ['plo1'] },
-    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',    plos: ['plo1'] }
+    { id: 'des796',  title: 'DES 796 — Thesis I',                                   plos: ['plo1'] },
+    { id: 'des797',  title: 'DES 797 — Thesis II',                                  plos: ['plo1'] }
   ],
 
-  manifestations: [
-    // ── DES 720A ──────────────────────────────────────────
-    { id: 'des720a_biomaterials', title: 'Engagement with bio-materials and alternative material practices',         plos: ['plo1'], classes: ['des720a'] },
-    { id: 'des720a_waste',        title: 'Understanding that waste is a design flaw',                               plos: ['plo1'], classes: ['des720a'] },
-    { id: 'des720a_ecology',      title: 'Environmental awareness and entanglement with ecological systems',        plos: ['plo1'], classes: ['des720a'] },
-    { id: 'des720a_principles',   title: 'Underlying principles that inform the work',                              plos: ['plo1'], classes: ['des720a'] },
-    { id: 'des720a_ai_ethics',    title: 'Critical engagement with the ethics of AI',                              plos: ['plo1'], classes: ['des720a'] },
-
-    // ── DES 720B ──────────────────────────────────────────
-    { id: 'des720b_waste',        title: 'Waste reduction and additive vs. subtractive manufacturing',              plos: ['plo1'], classes: ['des720b'] },
-    { id: 'des720b_pollution',    title: 'Proposals to reduce harmful manufacturing byproducts and remediate environment', plos: ['plo1'], classes: ['des720b'] },
-    { id: 'des720b_energy',       title: 'Considering energy consumption of technologies used in making',           plos: ['plo1'], classes: ['des720b'] },
-    { id: 'des720b_emerging',     title: 'Research, experimentation, and criticism of emerging manufacturing processes', plos: ['plo1'], classes: ['des720b'] },
-    { id: 'des720b_resources',    title: 'Intentional use of materials based on prevalence and availability',       plos: ['plo1'], classes: ['des720b'] },
-    { id: 'des720b_history',      title: 'Connecting to historical ways of being/doing and environmental change',   plos: ['plo1'], classes: ['des720b'] },
-
-    // ── DES 741 — IDs must match CSV score columns ────────
-    { id: 'score_slowness',             title: 'Slowness (deep listening, somatics, sustainable pacing)',                      plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_material',             title: 'Material considerations',                                                      plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_environmental_crisis', title: 'Content that engages the current environmental crisis',                        plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_natural_world',        title: 'Examining our relationship to the natural world',                              plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_equitable_design',     title: 'Design for an equitable and just society',                                    plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_stewardship',          title: 'Stewardship — attitude of care for living systems and the nonhuman world',    plos: ['plo1'], classes: ['des741'] },
-    { id: 'score_more_than_human',      title: 'Considering more than human stakeholders (ecosystems, animals, weather, materiality)', plos: ['plo1'], classes: ['des741'] },
-
-    // ── DES 751 ───────────────────────────────────────────
-    { id: 'des751_diy',           title: 'DIY ethos',                                                                          plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_lowcost',       title: 'Low-cost production',                                                                plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_material',      title: 'Material constraints',                                                               plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_diary',         title: 'Diary and journal-inspired practices',                                               plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_generative',    title: 'Generative methodologies: workshops, annotated collage, and material play',          plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_accessibility', title: 'Accessibility of knowledge sources',                                                 plos: ['plo1'], classes: ['des751'] },
-    { id: 'des751_speculative',   title: 'Speculative projects as methodologies for interpreting emerging ideas',              plos: ['plo1'], classes: ['des751'] },
-
-    // ── DES 730 ───────────────────────────────────────────
-    { id: 'des730_modification',  title: 'Modification to existing service/environment/artifact reflecting community needs',   plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_openended',     title: 'Open-ended questions and structured conversation with deep-knowledge holders',       plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_insitu',        title: 'In-situ, dynamic field research involving a participant',                            plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_documentation', title: 'Photos, textures, and video of social rituals as outsider (not insider)',            plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_spradley',      title: "Unobtrusive interaction using Spradley's 9 Dimensions",                             plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_citations',     title: 'Annotations and citations: census data, GIS, academic articles',                    plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_expertise',     title: 'Man-on-the-street vs. expert — formal, semi-formal, and informal',                  plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_mapping',       title: 'Observational mapping and behavioral zoning',                                        plos: ['plo1'], classes: ['des730'] },
-    { id: 'des730_assumptions',   title: 'Exploring unfamiliar people and locations to break assumptions',                     plos: ['plo1'], classes: ['des730'] },
-
-    // ── DES 796 ───────────────────────────────────────────
-    { id: 'des796_transcendence', title: 'Material transcendence, explorations of non-materiality',                            plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_resilience',    title: 'Evidence of resilience: sustained engagement, adaptive practice, ethics',            plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_sitespecific',  title: 'Site-specific inquiry (culturally, geographically, ecologically)',                   plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_slowness',      title: 'Slowness (long-term thinking, deep listening, sustainable pacing)',                  plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_morethan',      title: 'Considering more than human stakeholders',                                           plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_care',          title: 'Care, service, and contribution',                                                    plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_dialogue',      title: 'Deliberate dialogue: community, co-authorship, co-research, co-leadership',         plos: ['plo1'], classes: ['des796'] },
-    { id: 'des796_positionality', title: 'Positionality — students locating themselves as subjects within their own work',     plos: ['plo1'], classes: ['des796'] },
-
-    // ── DES 797 ───────────────────────────────────────────
-    { id: 'des797_sustained',     title: 'Sustained and systematic practice (continuation from Thesis I)',                     plos: ['plo1'], classes: ['des797'] },
-    { id: 'des797_transcendence', title: 'Material transcendence, explorations of non-materiality',                            plos: ['plo1'], classes: ['des797'] },
-    { id: 'des797_resilience',    title: 'Resilience: sustained engagement, adaptive practice, ethics and integrity',          plos: ['plo1'], classes: ['des797'] },
-    { id: 'des797_ecological',    title: 'Use of ecologically sustainable materials (book, paper, ink, production processes)', plos: ['plo1'], classes: ['des797'] },
-    { id: 'des797_community',     title: 'Work in the context of community and social engagement',                             plos: ['plo1'], classes: ['des797'] }
-
-    // DES 710A and DES 710B — manifestations to be added
-  ]
+  // Populated at runtime from data/manifestations.json
+  manifestations: []
 };
+
+/* ═══════════════════════════════════════════════════════════
+   EMBEDDED MANIFESTATIONS — fallback when fetch fails
+   ═══════════════════════════════════════════════════════════ */
+const EMBEDDED_MANIFESTATIONS = [
+  { "id": "des720a_biomaterials",       "title": "Engagement with bio-materials and alternative material practices",                       "plos": ["plo1"], "classes": ["des720a"] },
+  { "id": "des720a_waste",              "title": "Understanding that waste is a design flaw",                                              "plos": ["plo1"], "classes": ["des720a"] },
+  { "id": "des720a_ecology",            "title": "Environmental awareness and entanglement with ecological systems",                        "plos": ["plo1"], "classes": ["des720a"] },
+  { "id": "des720a_principles",         "title": "Underlying principles that inform the work",                                             "plos": ["plo1"], "classes": ["des720a"] },
+  { "id": "des720a_ai_ethics",          "title": "Critical engagement with the ethics of AI",                                              "plos": ["plo1"], "classes": ["des720a"] },
+  { "id": "des720b_waste",              "title": "Waste reduction and additive vs. subtractive manufacturing",                             "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "des720b_pollution",          "title": "Proposals to reduce harmful manufacturing byproducts and remediate environment",          "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "des720b_energy",             "title": "Considering energy consumption of technologies used in making",                          "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "des720b_emerging",           "title": "Research, experimentation, and criticism of emerging manufacturing processes",            "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "des720b_resources",          "title": "Intentional use of materials based on prevalence and availability",                      "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "des720b_history",            "title": "Connecting to historical ways of being/doing and environmental change",                  "plos": ["plo1"], "classes": ["des720b"] },
+  { "id": "score_slowness",             "title": "Slowness (deep listening, somatics, sustainable pacing)",                                "plos": ["plo1"], "classes": ["des741", "des796"] },
+  { "id": "score_material",             "title": "Material considerations",                                                                "plos": ["plo1"], "classes": ["des741", "des751"] },
+  { "id": "score_environmental_crisis", "title": "Content that engages the current environmental crisis",                                  "plos": ["plo1"], "classes": ["des741"] },
+  { "id": "score_natural_world",        "title": "Examining our relationship to the natural world",                                        "plos": ["plo1"], "classes": ["des741"] },
+  { "id": "score_equitable_design",     "title": "Design for an equitable and just society",                                              "plos": ["plo1"], "classes": ["des741"] },
+  { "id": "score_stewardship",          "title": "Stewardship — attitude of care for living systems and the nonhuman world",              "plos": ["plo1"], "classes": ["des741", "des796"] },
+  { "id": "score_more_than_human",      "title": "Considering more than human stakeholders (ecosystems, animals, weather, materiality)",   "plos": ["plo1"], "classes": ["des741", "des796"] },
+  { "id": "des751_diy",                 "title": "DIY ethos",                                                                              "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des751_lowcost",             "title": "Low-cost production",                                                                    "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des751_diary",               "title": "Diary and journal-inspired practices",                                                   "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des751_generative",          "title": "Generative methodologies: workshops, annotated collage, and material play",              "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des751_accessibility",       "title": "Accessibility of knowledge sources",                                                     "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des751_speculative",         "title": "Speculative projects as methodologies for interpreting emerging ideas",                  "plos": ["plo1"], "classes": ["des751"] },
+  { "id": "des730_modification",        "title": "Modification to existing service/environment/artifact reflecting community needs",       "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_openended",           "title": "Open-ended questions and structured conversation with deep-knowledge holders",           "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_insitu",              "title": "In-situ, dynamic field research involving a participant",                                "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_documentation",       "title": "Photos, textures, and video of social rituals as outsider (not insider)",               "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_spradley",            "title": "Unobtrusive interaction using Spradley's 9 Dimensions",                                 "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_citations",           "title": "Annotations and citations: census data, GIS, academic articles",                        "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_expertise",           "title": "Man-on-the-street vs. expert — formal, semi-formal, and informal",                     "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_mapping",             "title": "Observational mapping and behavioral zoning",                                            "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des730_assumptions",         "title": "Exploring unfamiliar people and locations to break assumptions",                         "plos": ["plo1"], "classes": ["des730"] },
+  { "id": "des796_transcendence",       "title": "Material transcendence, explorations of non-materiality",                               "plos": ["plo1"], "classes": ["des796", "des797"] },
+  { "id": "des796_resilience",          "title": "Evidence of resilience: sustained engagement, adaptive practice, ethics",               "plos": ["plo1"], "classes": ["des796", "des797"] },
+  { "id": "des796_sitespecific",        "title": "Site-specific inquiry (culturally, geographically, ecologically)",                      "plos": ["plo1"], "classes": ["des796"] },
+  { "id": "des796_dialogue",            "title": "Deliberate dialogue: community, co-authorship, co-research, co-leadership",             "plos": ["plo1"], "classes": ["des796"] },
+  { "id": "des796_positionality",       "title": "Positionality — students locating themselves as subjects within their own work",        "plos": ["plo1"], "classes": ["des796"] },
+  { "id": "des797_sustained",           "title": "Sustained and systematic practice (continuation from Thesis I)",                        "plos": ["plo1"], "classes": ["des797"] },
+  { "id": "des797_ecological",          "title": "Use of ecologically sustainable materials (book, paper, ink, production processes)",    "plos": ["plo1"], "classes": ["des797"] },
+  { "id": "des797_community",           "title": "Work in the context of community and social engagement",                                "plos": ["plo1"], "classes": ["des797"] }
+];
+
+/* ═══════════════════════════════════════════════════════════
+   NORMALIZE MANIFESTATIONS — converts both old and new JSON
+   formats into the internal representation used by the graph.
+   New format: { manifestations: [{id, manifestation, classes}] }
+   Old format: [{id, title, plos, classes}]
+   ═══════════════════════════════════════════════════════════ */
+function normalizeManifestations(data) {
+  const raw = Array.isArray(data) ? data : (data.manifestations || []);
+
+  // Human-readable class names → internal IDs used in PROGRAM_DATA
+  const CLASS_NAME_MAP = {
+    'DES 720A': 'des720a', 'DES 720B': 'des720b',
+    'DES 710A': 'des710a', 'DES 710B': 'des710b',
+    'DES 751':  'des751',  'DES 730A/B': 'des730',
+    'DES 741':  'des741',  'DES 796':  'des796',
+    'DES 797':  'des797'
+  };
+
+  // M-id → CSV score column (only the 7 themes scored in current artifacts.csv)
+  const SCORE_COL_MAP = {
+    'M1':  'score_material',
+    'M11': 'score_slowness',
+    'M12': 'score_environmental_crisis',
+    'M13': 'score_natural_world',
+    'M14': 'score_equitable_design',
+    'M15': 'score_stewardship',
+    'M16': 'score_more_than_human'
+  };
+
+  return raw.map(m => {
+    const classes = (m.classes || []).map(c => CLASS_NAME_MAP[c] || c);
+    return {
+      id:          m.id,
+      title:       m.manifestation || m.title || m.id,
+      plos:        m.plos || ['plo1'],
+      classes,
+      scoreColumn: SCORE_COL_MAP[m.id] || null
+    };
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════
    EMBEDDED CSV — fallback when not served over HTTP
@@ -445,7 +466,6 @@ const PLO_COLORS = {
 function ploColor(ploId) { return PLO_COLORS[ploId] || '#888'; }
 
 function nodeColor(d) {
-  if (d.type === 'plo') return PLO_COLORS[d.id] || '#888';
   const primaryPlo = (d.plos && d.plos[0]) || 'plo1';
   const base = d3.color(PLO_COLORS[primaryPlo] || '#888');
   if (d.type === 'class')         return d3.interpolateRgb(base, '#777')(0.3);
@@ -466,7 +486,6 @@ function initClassColors() {
 function classColor(classId) { return CLASS_COLORS[classId] || '#888'; }
 
 function nodeRadius(d) {
-  if (d.type === 'plo')           return 28;
   if (d.type === 'class')         return 18;
   if (d.type === 'manifestation') return 13;
   return 7;
@@ -483,7 +502,11 @@ const state = {
 };
 
 // D3 globals
-let svg, svgWidth, svgHeight;
+let svg, svgWidth, svgHeight, zoom;
+// Simulation world size — much larger than the viewport so nodes can spread freely.
+// The zoom/pan layer is the window into this space.
+const SIM_W = 4000;
+const SIM_H = 4000;
 let sim1, sim2;
 let progLinkSel, progNodeSel, artNodeSel;
 let _programNodes = [], _programLinks = [], _manifestationNodes = [];
@@ -557,17 +580,47 @@ function setupSVG() {
     .attr('width', svgWidth)
     .attr('height', svgHeight);
 
-  svg.append('g').attr('id', 'layer-prog-links');
-  svg.append('g').attr('id', 'layer-art-nodes');   // artifacts UNDER program nodes
-  svg.append('g').attr('id', 'layer-prog-nodes');   // program nodes always on top
-  svg.append('g').attr('id', 'layer-legend');
+  // Zoom layer wraps all graph content (not the legend)
+  const zoomLayer = svg.append('g').attr('id', 'zoom-layer');
+  zoomLayer.append('g').attr('id', 'layer-prog-links');
+  zoomLayer.append('g').attr('id', 'layer-art-nodes');   // artifacts UNDER program nodes
+  zoomLayer.append('g').attr('id', 'layer-prog-nodes');  // program nodes always on top
+  svg.append('g').attr('id', 'layer-legend');            // legend stays fixed
+
+  // Zoom + pan behavior
+  zoom = d3.zoom()
+    .scaleExtent([0.2, 8])
+    .on('zoom', (event) => {
+      const { x, y, k } = event.transform;
+      zoomLayer.attr('transform', `translate(${x},${y}) scale(${k})`);
+      // Counter-scale text so labels stay the same screen size
+      svg.selectAll('.prog-label').attr('font-size', function() {
+        const base = parseFloat(d3.select(this).attr('data-base-size') || this.getAttribute('font-size') || 7);
+        d3.select(this).attr('data-base-size', base);
+        return `${base / k}px`;
+      });
+      // Also counter-scale label dy (distance below node stays consistent)
+      svg.selectAll('.prog-label').attr('dy', function() {
+        const base = parseFloat(d3.select(this).attr('data-base-dy') || this.getAttribute('dy') || 0);
+        d3.select(this).attr('data-base-dy', base);
+        return base / k;
+      });
+    });
+
+  svg.call(zoom);
+
+  // Double-click to reset zoom
+  svg.on('dblclick.zoom', null); // disable d3's default dblclick zoom
+  svg.on('dblclick', () => svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity));
 
   // Click/tap on empty canvas clears any active manifestation highlight
   svg.on('click.clearHighlight touchend.clearHighlight', (event) => {
-    if (event.target === svg.node()) clearManifestationHighlight();
+    if (event.target === svg.node() || event.target === zoomLayer.node()) {
+      clearManifestationHighlight();
+    }
   });
 
-  // Resize observer — re-pin PLOs to new quadrant positions on resize
+  // Resize observer — re-pin class nodes to new circle positions on resize
   new ResizeObserver(() => {
     const w = wrap.clientWidth, h = wrap.clientHeight;
     if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
@@ -575,9 +628,9 @@ function setupSVG() {
     svg.attr('width', svgWidth).attr('height', svgHeight);
     if (sim1) {
       sim1.nodes()
-        .filter(n => n.type === 'plo')
+        .filter(n => n.type === 'class')
         .forEach(n => {
-          const pos = ploQuadrantPos(n.id);
+          const pos = classCirclePos(n.id);
           n.fx = pos.x; n.fy = pos.y;
           n.x  = pos.x; n.y  = pos.y;
         });
@@ -612,14 +665,14 @@ function boundaryForce(getWidth, getHeight, padding) {
 function customAttractionForce(manifestationNodes) {
   let _nodes = [];
   function force(alpha) {
-    const ATTRACT_K = 0.18 * Math.min(1, (svgWidth * svgHeight) / (900 * 600));
+    const ATTRACT_K = 0.18 * Math.min(1, (SIM_W * SIM_H) / (900 * 600));
     _nodes.forEach(artifact => {
       let totalScore = 0;
-      manifestationNodes.forEach(m => { totalScore += artifact[m.id] || 0; });
+      manifestationNodes.forEach(m => { totalScore += artifact[m.scoreColumn || m.id] || 0; });
 
       manifestationNodes.forEach(mNode => {
         if (mNode.x == null || mNode.y == null) return;
-        const score = artifact[mNode.id] || 0;
+        const score = artifact[mNode.scoreColumn || mNode.id] || 0;
         if (score <= 0) return;
 
         const weight  = score / 100;
@@ -643,7 +696,7 @@ function customAttractionForce(manifestationNodes) {
 
       // Artifacts with no scores at all: gentle pull toward canvas center
       if (totalScore === 0) {
-        const cx = svgWidth * 0.5, cy = svgHeight * 0.5;
+        const cx = SIM_W * 0.5, cy = SIM_H * 0.5;
         artifact.vx += (cx - artifact.x) * 0.002 * alpha;
         artifact.vy += (cy - artifact.y) * 0.002 * alpha;
       }
@@ -654,28 +707,26 @@ function customAttractionForce(manifestationNodes) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   PLO QUADRANT POSITIONS — computed from current viewport
+   CLASS CIRCLE POSITIONS — computed from current viewport
    ═══════════════════════════════════════════════════════════ */
-const PLO_OFFSETS = { plo1: [-1,-1], plo2: [1,-1], plo3: [-1,1], plo4: [1,1] };
-
-function ploQuadrantPos(ploId) {
-  // Program graph lives in left ~38% of canvas, vertically centred
-  const cx = svgWidth  * 0.28;
-  const cy = svgHeight * 0.50;
-  const rx = Math.min(svgWidth  * 0.16, 130); // horizontal radius
-  const ry = Math.min(svgHeight * 0.28, 150); // vertical radius
-  const o  = PLO_OFFSETS[ploId];
-  if (!o) return { x: cx, y: cy };
-  return { x: cx + o[0] * rx, y: cy + o[1] * ry };
+function classCirclePos(classId) {
+  const classes = PROGRAM_DATA.classes;
+  const idx = classes.findIndex(c => c.id === classId);
+  if (idx < 0) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
+  const cx = SIM_W * 0.30;
+  const cy = SIM_H * 0.50;
+  const rx = SIM_W * 0.18;
+  const ry = SIM_H * 0.30;
+  const angle = (idx / classes.length) * 2 * Math.PI - Math.PI / 2;
+  return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
 }
 
 /* ═══════════════════════════════════════════════════════════
    SIMULATION 1 — Program Graph
-   PLOs are PINNED at quadrant positions (fx/fy).
-   Classes and Manifestations float around them via force.
+   Classes are PINNED in a circle (fx/fy).
+   Manifestations float around them via force.
    ═══════════════════════════════════════════════════════════ */
 function buildProgramSimulation(visibleClasses) {
-  const ploNodes = PROGRAM_DATA.plos.map(p => ({ ...p, type: 'plo' }));
   const classNodes = PROGRAM_DATA.classes
     .filter(c => visibleClasses.has(c.id))
     .map(c => ({ ...c, type: 'class' }));
@@ -683,23 +734,18 @@ function buildProgramSimulation(visibleClasses) {
     .filter(m => m.classes.some(cid => visibleClasses.has(cid)))
     .map(m => ({ ...m, type: 'manifestation' }));
 
-  const nodes = [...ploNodes, ...classNodes, ...manifestationNodes];
+  const nodes = [...classNodes, ...manifestationNodes];
   const nodeById = new Map(nodes.map(n => [n.id, n]));
 
-  // ── Pin PLO nodes to quadrant positions ──────────────────
-  ploNodes.forEach(n => {
-    const pos = ploQuadrantPos(n.id);
+  // ── Pin class nodes to circle positions ──────────────────
+  classNodes.forEach(n => {
+    const pos = classCirclePos(n.id);
     n.x  = pos.x;  n.y  = pos.y;
     n.fx = pos.x;  n.fy = pos.y;  // pinned — drag releases these
   });
 
+  // Links: class → manifestation only
   const links = [];
-  classNodes.forEach(c =>
-    c.plos.forEach(pid => {
-      const src = nodeById.get(pid);
-      if (src) links.push({ source: src, target: c, linkType: 'class' });
-    })
-  );
   manifestationNodes.forEach(m =>
     m.classes.forEach(cid => {
       const src = nodeById.get(cid);
@@ -707,9 +753,10 @@ function buildProgramSimulation(visibleClasses) {
     })
   );
 
-  // Helper: spawn position = centroid of a node's linked PLOs + small jitter
-  function centroidSpawn(ploIds) {
-    const positions = (ploIds || ['plo1']).map(pid => ploQuadrantPos(pid));
+  // Helper: spawn position = centroid of a manifestation's linked classes + jitter
+  function centroidSpawn(classIds) {
+    const positions = (classIds || []).map(cid => classCirclePos(cid));
+    if (!positions.length) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
     const ax = positions.reduce((s, p) => s + p.x, 0) / positions.length;
     const ay = positions.reduce((s, p) => s + p.y, 0) / positions.length;
     return {
@@ -718,21 +765,21 @@ function buildProgramSimulation(visibleClasses) {
     };
   }
 
-  // Preserve positions for non-PLO nodes that already existed
+  // Preserve positions for manifestation nodes that already existed
   if (sim1) {
-    const oldById = new Map(sim1.nodes().filter(n => n.type !== 'plo').map(n => [n.id, n]));
-    [...classNodes, ...manifestationNodes].forEach(n => {
+    const oldById = new Map(sim1.nodes().filter(n => n.type !== 'class').map(n => [n.id, n]));
+    manifestationNodes.forEach(n => {
       const old = oldById.get(n.id);
       if (old) { n.x = old.x; n.y = old.y; n.vx = old.vx || 0; n.vy = old.vy || 0; }
       else {
-        const sp = centroidSpawn(n.plos);
+        const sp = centroidSpawn(n.classes);
         n.x = sp.x; n.y = sp.y;
       }
     });
   } else {
-    // First build — spawn each node near centroid of its linked PLOs
-    [...classNodes, ...manifestationNodes].forEach(n => {
-      const sp = centroidSpawn(n.plos);
+    // First build — spawn each manifestation near its linked classes
+    manifestationNodes.forEach(n => {
+      const sp = centroidSpawn(n.classes);
       n.x = sp.x; n.y = sp.y;
     });
   }
@@ -740,22 +787,20 @@ function buildProgramSimulation(visibleClasses) {
   if (sim1) sim1.stop();
 
   // Link distance scales with viewport
-  const vscale = Math.min(svgWidth, svgHeight) / 600;
-  const classDist    = Math.max(50, Math.min(100, 90 * vscale));
-  const manifestDist = Math.max(35, Math.min(70,  65 * vscale));
+  const manifestDist = 180;
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
       .id(d => d.id)
-      .distance(d => d.linkType === 'class' ? classDist : manifestDist)
-      .strength(d => d.linkType === 'class' ? 0.7 : 0.6))
+      .distance(manifestDist)
+      .strength(0.6))
     .force('charge', d3.forceManyBody()
-      // PLOs are pinned so charge only matters for classes/manifestations
-      .strength(d => d.type === 'class' ? -60 : d.type === 'manifestation' ? -40 : 0))
+      // Classes are pinned so charge only matters for manifestations
+      .strength(d => d.type === 'manifestation' ? -120 : 0))
     .force('collide', d3.forceCollide()
       .radius(d => nodeRadius(d) + 6)
       .strength(0.8))
-    .force('boundary', boundaryForce(() => svgWidth, () => svgHeight, 10))
+    .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.02)
     .velocityDecay(0.45)
     .stop()   // prevent auto-start; caller is responsible for starting
@@ -770,7 +815,7 @@ function buildProgramSimulation(visibleClasses) {
 function topManifestationFor(artifact, manifestationNodes) {
   let best = null, bestScore = -1;
   manifestationNodes.forEach(m => {
-    const s = artifact[m.id] || 0;
+    const s = artifact[m.scoreColumn || m.id] || 0;
     if (s > bestScore) { bestScore = s; best = m; }
   });
   return best;
@@ -788,8 +833,8 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
     } else {
       const top = topManifestationFor(a, manifestationNodes);
       // Use manifestation's current position if available; otherwise scatter in right half
-      const bx = (top?.x != null && top.x > 10) ? top.x : svgWidth * 0.6 + Math.random() * svgWidth * 0.3;
-      const by = (top?.y != null) ? top.y : svgHeight * 0.2 + Math.random() * svgHeight * 0.6;
+      const bx = (top?.x != null && top.x > 10) ? top.x : SIM_W * 0.6 + Math.random() * SIM_W * 0.3;
+      const by = (top?.y != null) ? top.y : SIM_H * 0.2 + Math.random() * SIM_H * 0.6;
       a.x = bx + (Math.random() - 0.5) * 60;
       a.y = by + (Math.random() - 0.5) * 60;
     }
@@ -801,7 +846,7 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
     .force('attract',   customAttractionForce(manifestationNodes))
     .force('collide',   d3.forceCollide(5).strength(0.75))
     .force('charge',    d3.forceManyBody().strength(-2))
-    .force('boundary',  boundaryForce(() => svgWidth, () => svgHeight, 10))
+    .force('boundary',  boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.012)
     .velocityDecay(0.4)
     .stop()   // prevent auto-start; caller starts it
@@ -883,19 +928,10 @@ function renderAll() {
         g.append('circle')
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
-          .attr('fill-opacity', d => d.type === 'plo' ? 1 : 0.92)
+          .attr('fill-opacity', 0.92)
           .attr('stroke', '#fff')
-          .attr('stroke-width', d => d.type === 'plo' ? 3 : 2)
+          .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
-
-        // PLO label — short abbreviation inside circle
-        g.filter(d => d.type === 'plo')
-          .append('text')
-          .attr('class', 'prog-label')
-          .attr('font-size', '8.5px')
-          .attr('font-weight', '600')
-          .attr('fill', '#fff')
-          .text(d => d.id.toUpperCase());
 
         // Class label — small text below circle with subtle background
         g.filter(d => d.type === 'class')
@@ -966,8 +1002,8 @@ function renderArtifactNodes() {
         .attr('fill', d => classColor(d.class))
         .attr('fill-opacity', 0.7)
         .attr('stroke', 'none')
-        .attr('cx', d => d.x || svgWidth * 0.65)
-        .attr('cy', d => d.y || svgHeight / 2)
+        .attr('cx', d => d.x || SIM_W * 0.65)
+        .attr('cy', d => d.y || SIM_H * 0.5)
         .on('mouseover', showArtifactTooltip)
         .on('mouseleave', (event, d) => {
           if (state.activeManifestationId) {
@@ -980,12 +1016,8 @@ function renderArtifactNodes() {
               .attr('stroke',       scored ? classColor(d.class) : 'none');
             // Restore prog nodes to manifestation-highlight state (not full default)
             d3.selectAll('g.prog-node').select('circle')
-              .attr('fill-opacity', nd => {
-                if (nd.type === 'plo')   return 0.35;
-                if (nd.type === 'class') return 0.2;
-                return nd.id === mId ? 1 : 0.1;
-              })
-              .attr('stroke-width', nd => nd.id === mId ? 4 : nd.type === 'plo' ? 3 : 2);
+              .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
+              .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
           } else {
             d3.select(event.currentTarget)
               .attr('r', 3.5)
@@ -1185,12 +1217,8 @@ function highlightArtifactsForManifestation(mId) {
     .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
     .attr('stroke-width', 1.5);
   d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', nd => {
-      if (nd.type === 'plo')   return 0.35;
-      if (nd.type === 'class') return 0.2;
-      return nd.id === mId ? 1 : 0.1;
-    })
-    .attr('stroke-width', nd => nd.id === mId ? 4 : nd.type === 'plo' ? 3 : 2);
+    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
+    .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
 }
 
 function clearManifestationHighlight() {
@@ -1204,8 +1232,8 @@ function clearManifestationHighlight() {
 
 function restoreProgNodes() {
   d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', nd => nd.type === 'plo' ? 1 : 0.92)
-    .attr('stroke-width', nd => nd.type === 'plo' ? 3 : 2);
+    .attr('fill-opacity', 0.92)
+    .attr('stroke-width', 2);
 }
 
 function showArtifactTooltip(event, d) {
@@ -1218,21 +1246,15 @@ function showArtifactTooltip(event, d) {
   // Highlight manifestation nodes with a non-zero score; dim everything else
   const scoredIds = new Set(
     PROGRAM_DATA.manifestations
-      .filter(m => (d[m.id] || 0) > 0)
+      .filter(m => (d[m.scoreColumn || m.id] || 0) > 0)
       .map(m => m.id)
   );
   d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', nd => {
-      if (nd.type === 'plo') return 0.35;
-      if (nd.type === 'class') return 0.2;
-      return scoredIds.has(nd.id) ? 1 : 0.1;
-    })
-    .attr('stroke-width', nd =>
-      nd.type === 'manifestation' && scoredIds.has(nd.id) ? 4 : nd.type === 'plo' ? 3 : 2
-    );
+    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (scoredIds.has(nd.id) ? 1 : 0.1))
+    .attr('stroke-width', nd => nd.type === 'manifestation' && scoredIds.has(nd.id) ? 4 : 2);
 
   const scores = PROGRAM_DATA.manifestations
-    .map(m => ({ title: m.title, score: d[m.id] || 0, color: ploColor(m.plos[0]) }))
+    .map(m => ({ title: m.title, score: d[m.scoreColumn || m.id] || 0, color: ploColor(m.plos[0]) }))
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
@@ -1262,7 +1284,7 @@ function showArtifactTooltip(event, d) {
 }
 
 function showProgramTooltip(event, d) {
-  const typeLabel = { plo: 'Program Learning Outcome', class: 'Class', manifestation: 'Manifestation' }[d.type] || d.type;
+  const typeLabel = { class: 'Class', manifestation: 'Manifestation' }[d.type] || d.type;
   tooltipEl.innerHTML = `
     <div class="tt-title">${d.title}</div>
     <div class="tt-meta">${typeLabel}</div>`;
@@ -1304,9 +1326,18 @@ async function init() {
 
   let csvText = null;
   try {
-    const res = await fetch('./data/artifacts.csv');
-    if (res.ok) csvText = await res.text();
-  } catch (_) { /* file:// protocol — use embedded */ }
+    const [csvRes, mRes] = await Promise.all([
+      fetch('./data/artifacts.csv').catch(() => null),
+      fetch('./data/manifestations.json').catch(() => null)
+    ]);
+    if (csvRes?.ok) csvText = await csvRes.text();
+    if (mRes?.ok)   PROGRAM_DATA.manifestations = normalizeManifestations(await mRes.json());
+  } catch (_) { /* file:// protocol — use embedded fallbacks */ }
+
+  // Fallback to embedded manifestations if fetch didn't populate
+  if (!PROGRAM_DATA.manifestations.length) {
+    PROGRAM_DATA.manifestations = normalizeManifestations(EMBEDDED_MANIFESTATIONS);
+  }
 
   const rows = d3.csvParse(csvText ?? EMBEDDED_CSV);
   processData(rows, false);
@@ -1327,6 +1358,16 @@ async function init() {
 
   renderAll();
   startSimulations();
+
+  // Set initial zoom so the program graph fills the viewport on load.
+  // The program graph is centered around (SIM_W*0.30, SIM_H*0.50) in sim space.
+  // We scale to fit it within the viewport and center it.
+  const initScale = Math.min(svgWidth / SIM_W, svgHeight / SIM_H) * 2.5;
+  const focusX = SIM_W * 0.30;
+  const focusY = SIM_H * 0.50;
+  const tx = svgWidth  / 2 - focusX * initScale;
+  const ty = svgHeight / 2 - focusY * initScale;
+  svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initScale));
 }
 
 init();
