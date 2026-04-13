@@ -158,7 +158,6 @@
       dominant-baseline: middle;
       text-anchor: middle;
     }
-    .node-circle-hidden { display: none; }
     .prog-label--class { text-transform: uppercase; }
 
     /* ─── Artifact circles ────────────────────────────────── */
@@ -420,12 +419,33 @@ const SCORE_COLS = [
   'score_natural_world','score_equitable_design','score_stewardship',
   'score_more_than_human'
 ];
-const REQUIRED_COLS = ['author','thesis_title','class','paragraph',...SCORE_COLS];
+const REQUIRED_COLS = ['author','thesis_title','paragraph'];
+
+// Maps PLO-format CSV columns (new format) to the score_* columns the viz uses
+const PLO_TO_SCORE_MAP = {
+  'PLO1_P1M01': 'score_material',
+  'PLO1_P1M11': 'score_slowness',
+  'PLO1_P1M12': 'score_environmental_crisis',
+  'PLO1_P1M13': 'score_natural_world',
+  'PLO1_P1M14': 'score_equitable_design',
+  'PLO1_P1M15': 'score_stewardship',
+  'PLO1_P1M16': 'score_more_than_human'
+};
+
+// Accepts both old format (score_* columns + class) and new PLO format
+function normalizeRow(r) {
+  const out = { ...r };
+  Object.entries(PLO_TO_SCORE_MAP).forEach(([ploCol, scoreCol]) => {
+    if (!(scoreCol in out) && ploCol in out) out[scoreCol] = out[ploCol];
+  });
+  if (!out.class) out.class = 'des797';
+  return out;
+}
 
 function processData(rows, merge = false) {
   const coerced = rows.map((r, i) => {
-    const a = { ...r, _uid: merge ? state.allArtifacts.length + i : i };
-    SCORE_COLS.forEach(col => { a[col] = +(r[col]) || 0; });
+    const a = { ...normalizeRow(r), _uid: merge ? state.allArtifacts.length + i : i };
+    SCORE_COLS.forEach(col => { a[col] = +(a[col]) || 0; });
     return a;
   });
 
@@ -554,10 +574,17 @@ function boundaryForce(getWidth, getHeight, padding) {
 function customAttractionForce(manifestationNodes) {
   let _nodes = [];
   function force(alpha) {
-    const ATTRACT_K = 0.18 * Math.min(1, (SIM_W * SIM_H) / (900 * 600));
+    const ATTRACT_K = 0.35 * Math.min(1, (SIM_W * SIM_H) / (900 * 600));
     _nodes.forEach(artifact => {
       let totalScore = 0;
       manifestationNodes.forEach(m => { totalScore += artifact[m.scoreColumn || m.id] || 0; });
+
+      // Find the highest-scoring manifestation (used for bonus pull below)
+      let topScore = 0, topNode = null;
+      manifestationNodes.forEach(m => {
+        const s = artifact[m.scoreColumn || m.id] || 0;
+        if (s > topScore) { topScore = s; topNode = m; }
+      });
 
       manifestationNodes.forEach(mNode => {
         if (mNode.x == null || mNode.y == null) return;
@@ -565,7 +592,15 @@ function customAttractionForce(manifestationNodes) {
         if (score <= 0) return;
 
         const weight  = score / 100;
-        const weight2 = weight * weight;  // squared curve: high scores pull much harder
+        // Linear weight: even low scores pull meaningfully toward their manifestation
+        let effectiveWeight = weight;
+
+        // Bonus pull: if this is the top manifestation and its score > 30,
+        // amplify attraction so the artifact gravitates toward its strongest match
+        if (mNode === topNode && topScore > 30) {
+          const bonus = 1 + 2 * ((topScore - 30) / 70); // 1.0 at score=30 → 3.0 at score=100
+          effectiveWeight = weight * bonus;
+        }
 
         const dx   = mNode.x - artifact.x;
         const dy   = mNode.y - artifact.y;
@@ -578,7 +613,7 @@ function customAttractionForce(manifestationNodes) {
         // Spring: positive tension pulls in, negative pushes out (orbit at targetDist)
         const tension = (dist - targetDist) / dist;
 
-        const s = tension * weight2 * ATTRACT_K * alpha;
+        const s = tension * effectiveWeight * ATTRACT_K * alpha;
         artifact.vx += dx * s;
         artifact.vy += dy * s;
       });
@@ -696,7 +731,7 @@ function buildProgramSimulation(visibleClasses) {
       .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
       .strength(0.8))
     .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
-    .alphaDecay(0.02)
+    .alphaDecay(0.005)
     .velocityDecay(0.45)
     .stop()   // prevent auto-start; caller is responsible for starting
     .on('tick', onTick);
@@ -742,7 +777,7 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
     .force('collide',   d3.forceCollide(5).strength(0.75))
     .force('charge',    d3.forceManyBody().strength(-2))
     .force('boundary',  boundaryForce(() => SIM_W, () => SIM_H, 10))
-    .alphaDecay(0.012)
+    .alphaDecay(0.003)
     .velocityDecay(0.4)
     .stop()   // prevent auto-start; caller starts it
     .on('tick', onTick);
@@ -812,13 +847,13 @@ function wordsToLines(words, maxChars) {
 }
 
 // Estimates the collision radius for a manifestation node based on its text label size.
-// Uses ~9.6px/char (16px Poppins) and 19px line height to approximate the bounding box.
+// Uses ~8.4px/char (14px Poppins) and 17px line height to approximate the bounding box.
 function manifestationCollideRadius(d) {
   const words = (d.title || '').split(' ');
   const lines = wordsToLines(words, 30);
   const maxLen = Math.max(...lines.map(l => l.length));
-  const halfW = maxLen * 9.6 / 2 + 12;
-  const halfH = lines.length * 19 / 2 + 8;
+  const halfW = maxLen * 8.4 / 2 + 12;
+  const halfH = lines.length * 17 / 2 + 8;
   return Math.max(halfW, halfH);
 }
 
@@ -867,10 +902,10 @@ function renderAll() {
           .call(makeDrag(sim1));
 
         g.append('circle')
-          .attr('class', 'node-circle node-circle-hidden')
+          .attr('class', 'node-circle')
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
-          .attr('fill-opacity', 0.92)
+          .attr('fill-opacity', 0.2)
           .attr('stroke', d => d.type === 'manifestation' ? '#000' : '#fff')
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
@@ -879,7 +914,7 @@ function renderAll() {
         g.filter(d => d.type === 'class')
           .append('text')
           .attr('class', 'prog-label prog-label--class')
-          .attr('font-size', '13px')
+          .attr('font-size', '10px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
@@ -890,21 +925,21 @@ function renderAll() {
             const sep = d.title.indexOf(' — ');
             const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
             const name = sep >= 0 ? d.title.slice(sep + 3) : '';
-            wrapTextLabel(this, name ? [code, name] : [code], 12);
+            wrapTextLabel(this, name ? [code, name] : [code], 11);
           });
 
         // Manifestation label — single <text> per node, word-wrapped via wrapTextLabel
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
-          .attr('font-size', '16px')
+          .attr('font-size', '11px')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
           .attr('stroke', 'rgba(0,0,0,0.85)')
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 19);
+            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 14);
           });
 
         g.on('mouseover', showProgramTooltip)
@@ -1088,6 +1123,8 @@ function renderAuthorFilters() {
   const container = document.getElementById('author-filters');
   container.innerHTML = '';
   const authors = [...new Set(state.allArtifacts.map(a => a.author))].sort();
+  const timers = {};
+
   authors.forEach(author => {
     const label = document.createElement('label');
     label.className = 'filter-item';
@@ -1096,10 +1133,39 @@ function renderAuthorFilters() {
     cb.type = 'checkbox';
     cb.checked = state.visibleAuthors.has(author);
     cb.dataset.author = author;
-    cb.addEventListener('change', e => {
-      if (e.target.checked) state.visibleAuthors.add(author);
-      else state.visibleAuthors.delete(author);
-      updateFilters(true);
+
+    // Use click on the label with a timer to distinguish single vs double click.
+    // Prevents the native change event from firing mid-double-click.
+    label.addEventListener('click', e => {
+      e.preventDefault(); // stop checkbox from toggling immediately
+
+      if (timers[author]) {
+        // Second click within 250ms — treat as double click
+        clearTimeout(timers[author]);
+        delete timers[author];
+
+        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))];
+        const onlyThisSelected =
+          state.visibleAuthors.size === 1 && state.visibleAuthors.has(author);
+        if (onlyThisSelected) {
+          allAuthors.forEach(a => state.visibleAuthors.add(a));
+        } else {
+          state.visibleAuthors.clear();
+          state.visibleAuthors.add(author);
+        }
+        renderAuthorFilters();
+        updateFilters(true);
+      } else {
+        // First click — wait to see if a second follows
+        timers[author] = setTimeout(() => {
+          delete timers[author];
+          // Single click: toggle
+          if (state.visibleAuthors.has(author)) state.visibleAuthors.delete(author);
+          else state.visibleAuthors.add(author);
+          cb.checked = state.visibleAuthors.has(author);
+          updateFilters(true);
+        }, 250);
+      }
     });
 
     const name = document.createElement('span');
@@ -1152,7 +1218,7 @@ function clearManifestationHighlight() {
 
 function restoreProgNodes() {
   d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', 0.92)
+    .attr('fill-opacity', 0.2)
     .attr('stroke-width', 2);
 }
 
