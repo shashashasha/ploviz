@@ -421,7 +421,7 @@ function computeManifestationSizes() {
    ═══════════════════════════════════════════════════════════ */
 const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
-const ARTIFACT_COLLISION_RADIUS = 7;
+const ARTIFACT_COLLISION_RADIUS = 6;
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -602,7 +602,7 @@ function distanceScaledCollisionForce(manifestationNodes) {
     const distFromCenter = Math.sqrt(dx * dx + dy * dy);
     const distBeyondRing = Math.max(0, distFromCenter - nodeRadius(mNode));
     // At the ring surface → radius ≈ 2.5px (tight); grows 0.14px per pixel further out
-    return Math.max(ARTIFACT_RADIUS + 0.5, 2.5 + distBeyondRing * 0.14);
+    return Math.min(Math.max(ARTIFACT_RADIUS + 0.5, 2.5 + distBeyondRing * 0.12), 40);
   }
 
   function force() {
