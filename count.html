@@ -1051,6 +1051,14 @@ function switchPlo(ploKey) {
 /* ═══════════════════════════════════════════════════════════
    SIDEBAR
    ═══════════════════════════════════════════════════════════ */
+// Returns "FirstName L." format, or null if the name is blank/whitespace.
+function formatAuthorName(name) {
+  if (!name || !name.trim()) return null;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+
 function renderSidebar() {
   renderPloInfo();
   renderAuthorFilters();
@@ -1075,7 +1083,9 @@ function renderPloInfo() {
 function renderAuthorFilters() {
   const container = document.getElementById('author-filters');
   container.innerHTML = '';
-  const authors = [...new Set(state.allArtifacts.map(a => a.author))].sort();
+  const authors = [...new Set(state.allArtifacts.map(a => a.author))]
+    .filter(a => formatAuthorName(a) !== null)
+    .sort();
   const timers = {};
 
   authors.forEach(author => {
@@ -1097,7 +1107,8 @@ function renderAuthorFilters() {
         clearTimeout(timers[author]);
         delete timers[author];
 
-        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))];
+        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))]
+          .filter(a => formatAuthorName(a) !== null);
         const onlyThisSelected =
           state.visibleAuthors.size === 1 && state.visibleAuthors.has(author);
         if (onlyThisSelected) {
@@ -1122,7 +1133,7 @@ function renderAuthorFilters() {
     });
 
     const name = document.createElement('span');
-    name.textContent = author;
+    name.textContent = formatAuthorName(author);
 
     label.append(cb, name);
     container.appendChild(label);
@@ -1195,7 +1206,7 @@ function showArtifactTooltip(event, d) {
   const snippet = excerpt.length > snippetLength ? excerpt.slice(0, snippetLength) + '…' : excerpt;
 
   tooltipEl.innerHTML = `
-    <div class="tt-title">${d.author}</div>
+    <div class="tt-title">${formatAuthorName(d.author) || d.author}</div>
     <div class="tt-meta">${d.thesis_title}</div>
     <hr class="tt-divider">
     <div class="tt-scores-label" style="color:${mColor}">${mInfo ? mInfo.title : d.targetManifestationId}</div>

@@ -1069,6 +1069,14 @@ function switchPlo(ploKey) {
 /* ═══════════════════════════════════════════════════════════
    SIDEBAR
    ═══════════════════════════════════════════════════════════ */
+// Returns "FirstName L." format, or null if the name is blank/whitespace.
+function formatAuthorName(name) {
+  if (!name || !name.trim()) return null;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+
 function renderSidebar() {
   renderPloInfo();
   renderAuthorFilters();
@@ -1093,7 +1101,9 @@ function renderPloInfo() {
 function renderAuthorFilters() {
   const container = document.getElementById('author-filters');
   container.innerHTML = '';
-  const authors = [...new Set(state.allArtifacts.map(a => a.author))].sort();
+  const authors = [...new Set(state.allArtifacts.map(a => a.author))]
+    .filter(a => formatAuthorName(a) !== null)
+    .sort();
   const timers = {};
 
   authors.forEach(author => {
@@ -1115,7 +1125,8 @@ function renderAuthorFilters() {
         clearTimeout(timers[author]);
         delete timers[author];
 
-        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))];
+        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))]
+          .filter(a => formatAuthorName(a) !== null);
         const onlyThisSelected =
           state.visibleAuthors.size === 1 && state.visibleAuthors.has(author);
         if (onlyThisSelected) {
@@ -1140,7 +1151,7 @@ function renderAuthorFilters() {
     });
 
     const name = document.createElement('span');
-    name.textContent = author;
+    name.textContent = formatAuthorName(author);
 
     label.append(cb, name);
     container.appendChild(label);
@@ -1220,7 +1231,7 @@ function showArtifactTooltip(event, d) {
   const classTitle = PROGRAM_DATA.classes.find(c => c.id === d.class)?.title || d.class;
 
   tooltipEl.innerHTML = `
-    <div class="tt-title">${d.author}</div>
+    <div class="tt-title">${formatAuthorName(d.author) || d.author}</div>
     <div class="tt-meta">${classTitle} &nbsp;·&nbsp; ${d.thesis_title}</div>
     <hr class="tt-divider">
     <div class="tt-excerpt">${excerpt}</div>
