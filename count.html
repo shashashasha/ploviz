@@ -379,6 +379,10 @@ function nodeRadius(d) {
   return 7;
 }
 
+// count.html uses larger artifact nodes (3× the base 3.5)
+const ARTIFACT_RADIUS       = 10;
+const ARTIFACT_RADIUS_HOVER = 14;
+
 /* ═══════════════════════════════════════════════════════════
    STATE
    ═══════════════════════════════════════════════════════════ */
@@ -550,7 +554,7 @@ function boundaryForce(getWidth, getHeight, padding) {
     const W = getWidth(), H = getHeight();
     const strength = 0.18 * alpha;
     _nodes.forEach(n => {
-      const r = (n.type ? nodeRadius(n) : 8) + padding;
+      const r = (n.type ? nodeRadius(n) : ARTIFACT_RADIUS) + padding;
       if (n.x < r)       n.vx += (r - n.x) * strength;
       if (n.x > W - r)   n.vx -= (n.x - (W - r)) * strength;
       if (n.y < r)       n.vy += (r - n.y) * strength;
@@ -558,6 +562,31 @@ function boundaryForce(getWidth, getHeight, padding) {
     });
   }
   force.initialize = function(nodes) { _nodes = nodes; };
+  return force;
+}
+
+// Pushes artifact nodes away from manifestation node circles so they don't overlap.
+function manifestationCircleCollisionForce(manifestationNodes) {
+  let _nodes = [];
+  function force() {
+    _nodes.forEach(artifact => {
+      manifestationNodes.forEach(m => {
+        if (m.x == null || m.y == null) return;
+        const dx   = artifact.x - m.x;
+        const dy   = artifact.y - m.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const minDist = nodeRadius(m) + ARTIFACT_RADIUS;
+        if (dist < minDist) {
+          const push = (minDist - dist) / dist;
+          artifact.vx += dx * push * 0.6;
+          artifact.vy += dy * push * 0.6;
+        }
+      });
+    });
+  }
+  force.initialize = function(nodes) {
+    _nodes = nodes.filter(n => n.targetManifestationId);
+  };
   return force;
 }
 
@@ -678,7 +707,7 @@ function buildProgramSimulation(visibleClasses) {
       .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
       .strength(d => d.target.classes?.length >= 2 ? 1.0 : 0.4))
     .force('charge', d3.forceManyBody()
-      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -200 : 0))
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -50 : 0))
     // Soft home force — keeps class nodes near their circle positions
     .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
       .strength(d => d.type === 'class' ? 0.06 : 0))
@@ -726,9 +755,10 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
   if (sim2) sim2.stop();
 
   sim2 = d3.forceSimulation(visibleArtifacts)
-    .force('attract',   customAttractionForce(manifestationNodes))
-    .force('collide',   d3.forceCollide(5).strength(0.75))
-    .force('charge',    d3.forceManyBody().strength(-2))
+    .force('attract',     customAttractionForce(manifestationNodes))
+    .force('mCollide',    manifestationCircleCollisionForce(manifestationNodes))
+    .force('collide',     d3.forceCollide(ARTIFACT_RADIUS).strength(0.75))
+    .force('charge',      d3.forceManyBody().strength(-2))
     .force('boundary',  boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.003)
     .velocityDecay(0.4)
@@ -932,7 +962,7 @@ function renderArtifactNodes() {
     .join(
       enter => enter.append('circle')
         .attr('class', 'artifact')
-        .attr('r', 3.5)
+        .attr('r', ARTIFACT_RADIUS)
         .attr('fill', d => artifactFill(d))
         .attr('fill-opacity', 0.7)
         .attr('stroke', 'none')
@@ -945,7 +975,7 @@ function renderArtifactNodes() {
             const mId = state.activeManifestationId;
             const scored = (d[mId] || 0) > 0;
             d3.select(event.currentTarget)
-              .attr('r',            scored ? 5    : 3.5)
+              .attr('r',            scored ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
               .attr('fill-opacity', scored ? 1    : 0.1)
               .attr('stroke',       scored ? classColor(d.class) : 'none');
             // Restore prog nodes to manifestation-highlight state (not full default)
@@ -954,7 +984,7 @@ function renderArtifactNodes() {
               .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
           } else {
             d3.select(event.currentTarget)
-              .attr('r', 3.5)
+              .attr('r', ARTIFACT_RADIUS)
               .attr('fill', artifactFill(d))
               .attr('stroke', 'none')
               .attr('fill-opacity', 0.7);
@@ -1161,7 +1191,7 @@ function positionTooltip(event) {
 function highlightArtifactsForManifestation(mId) {
   state.activeManifestationId = mId;
   d3.selectAll('circle.artifact')
-    .attr('r',            d => (d[mId] || 0) > 0 ? 5    : 3.5)
+    .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
     .attr('fill-opacity', d => (d[mId] || 0) > 0 ? 1    : 0.1)
     .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
     .attr('stroke-width', 1.5);
@@ -1173,7 +1203,7 @@ function highlightArtifactsForManifestation(mId) {
 function clearManifestationHighlight() {
   state.activeManifestationId = null;
   d3.selectAll('circle.artifact')
-    .attr('r',            3.5)
+    .attr('r',            ARTIFACT_RADIUS)
     .attr('fill',         d => artifactFill(d))
     .attr('fill-opacity', 0.7)
     .attr('stroke',       'none');
@@ -1191,7 +1221,7 @@ function showArtifactTooltip(event, d) {
   const mColor = mInfo ? ploColor(mInfo.plos[0]) : '#888';
 
   d3.select(event.currentTarget)
-    .attr('r', 5)
+    .attr('r', ARTIFACT_RADIUS_HOVER)
     .attr('stroke', mColor)
     .attr('stroke-width', 2)
     .attr('fill-opacity', 1);
