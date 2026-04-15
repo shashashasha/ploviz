@@ -161,6 +161,10 @@
     }
     .prog-label--class { text-transform: uppercase; }
 
+    /* ─── Label visibility toggles ───────────────────────── */
+    #main-svg.hide-manifestation-labels .prog-label:not(.prog-label--class) { display: none; }
+    #main-svg.hide-class-labels .prog-label--class { display: none; }
+
     /* ─── Artifact circles ────────────────────────────────── */
     .artifact {
       cursor: pointer;
@@ -255,6 +259,19 @@
         <option value="PLO2">PLO 2 — Situated knowledge</option>
       </select>
       <p id="plo-description" class="plo-description"></p>
+    </div>
+    <div class="sidebar-section">
+      <h3>Labels</h3>
+      <div class="filter-list">
+        <label class="filter-item">
+          <input type="checkbox" id="toggle-manifestation-labels" checked>
+          <span>Manifestation labels</span>
+        </label>
+        <label class="filter-item">
+          <input type="checkbox" id="toggle-class-labels" checked>
+          <span>Class labels</span>
+        </label>
+      </div>
     </div>
     <div class="sidebar-section">
       <h3>Authors</h3>
@@ -384,7 +401,7 @@ function nodeRadius(d) {
 // kept large so nodes spread out with clear space between them.
 const ARTIFACT_RADIUS           = 3;    // rendered circle size
 const ARTIFACT_RADIUS_HOVER     = 5;    // rendered circle size on hover
-const ARTIFACT_COLLISION_RADIUS = 18;   // personal-space bubble for force collision
+const ARTIFACT_COLLISION_RADIUS = 15;   // personal-space bubble for force collision
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -1327,6 +1344,16 @@ async function init() {
 }
 
 init();
+
+/* ═══════════════════════════════════════════════════════════
+   LABEL VISIBILITY TOGGLES
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('toggle-manifestation-labels').addEventListener('change', e => {
+  document.getElementById('main-svg').classList.toggle('hide-manifestation-labels', !e.target.checked);
+});
+document.getElementById('toggle-class-labels').addEventListener('change', e => {
+  document.getElementById('main-svg').classList.toggle('hide-class-labels', !e.target.checked);
+});
 </script>
 </body>
 </html>
