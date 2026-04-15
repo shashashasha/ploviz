@@ -162,8 +162,8 @@
     .prog-label--class { text-transform: uppercase; }
 
     /* ─── Label visibility toggles ───────────────────────── */
-    #main-svg.hide-manifestation-labels .prog-label:not(.prog-label--class) { display: none; }
-    #main-svg.hide-class-labels .prog-label--class { display: none; }
+    #main-svg.hide-manifestation-labels .prog-node--manifestation { display: none; }
+    #main-svg.hide-class-labels .prog-node--class { display: none; }
 
     /* ─── Artifact circles ────────────────────────────────── */
     .artifact {
@@ -888,7 +888,7 @@ function renderAll() {
     .join(
       enter => {
         const g = enter.append('g')
-          .attr('class', 'prog-node')
+          .attr('class', d => `prog-node prog-node--${d.type}`)
           .style('cursor', 'grab')
           .call(makeDrag(sim1));
 
