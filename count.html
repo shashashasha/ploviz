@@ -154,6 +154,7 @@
     /* ─── Program Graph Node Labels ──────────────────────── */
     .prog-label {
       font-family: 'Poppins', sans-serif;
+      font-size: 18px;
       pointer-events: none;
       dominant-baseline: middle;
       text-anchor: middle;
@@ -885,7 +886,6 @@ function renderAll() {
         g.filter(d => d.type === 'class')
           .append('text')
           .attr('class', 'prog-label prog-label--class')
-          .attr('font-size', '10px')
           .attr('font-weight', '500')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
@@ -903,7 +903,6 @@ function renderAll() {
         g.filter(d => d.type === 'manifestation')
           .append('text')
           .attr('class', 'prog-label')
-          .attr('font-size', '11px')
           .attr('fill', '#fff')
           .attr('paint-order', 'stroke')
           .attr('stroke', 'rgba(0,0,0,0.85)')
