@@ -381,8 +381,8 @@ function nodeRadius(d) {
 }
 
 // count.html uses larger artifact nodes (3× the base 3.5)
-const ARTIFACT_RADIUS       = 10;
-const ARTIFACT_RADIUS_HOVER = 14;
+const ARTIFACT_RADIUS       = 5;
+const ARTIFACT_RADIUS_HOVER = 8;
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -877,7 +877,7 @@ function renderAll() {
           .attr('class', 'node-circle')
           .attr('r', d => nodeRadius(d))
           .attr('fill', d => nodeColor(d))
-          .attr('fill-opacity', 0.2)
+          .attr('fill-opacity', 1)
           .attr('stroke', d => d.type === 'manifestation' ? '#000' : '#fff')
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
@@ -951,7 +951,7 @@ function renderArtifactNodes() {
         .attr('class', 'artifact')
         .attr('r', ARTIFACT_RADIUS)
         .attr('fill', d => artifactFill(d))
-        .attr('fill-opacity', 0.7)
+        .attr('fill-opacity', 1)
         .attr('stroke', 'none')
         .attr('cx', d => d.x || SIM_W * 0.65)
         .attr('cy', d => d.y || SIM_H * 0.5)
@@ -963,18 +963,19 @@ function renderArtifactNodes() {
             const scored = (d[mId] || 0) > 0;
             d3.select(event.currentTarget)
               .attr('r',            scored ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
-              .attr('fill-opacity', scored ? 1    : 0.1)
+              .attr('fill-opacity', scored ? 1    : 0.2)
               .attr('stroke',       scored ? classColor(d.class) : 'none');
             // Restore prog nodes to manifestation-highlight state (not full default)
             d3.selectAll('g.prog-node').select('circle')
-              .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
+              .attr('fill-opacity', nd => nd.type === 'class' ? .2 : (nd.id === mId ? 1 : 0.1))
               .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
           } else {
+            d3.selectAll('circle.artifact')
+              .attr('fill-opacity', 1);
             d3.select(event.currentTarget)
               .attr('r', ARTIFACT_RADIUS)
               .attr('fill', artifactFill(d))
-              .attr('stroke', 'none')
-              .attr('fill-opacity', 0.7);
+              .attr('stroke', 'none');
             restoreProgNodes();
           }
           hideTooltip();
@@ -1179,7 +1180,7 @@ function highlightArtifactsForManifestation(mId) {
   state.activeManifestationId = mId;
   d3.selectAll('circle.artifact')
     .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
-    .attr('fill-opacity', d => (d[mId] || 0) > 0 ? 1    : 0.1)
+    .attr('fill-opacity', d => d.targetManifestationId === mId ? 1 : 0.2)
     .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
     .attr('stroke-width', 1.5);
   d3.selectAll('g.prog-node').select('circle')
@@ -1192,20 +1193,23 @@ function clearManifestationHighlight() {
   d3.selectAll('circle.artifact')
     .attr('r',            ARTIFACT_RADIUS)
     .attr('fill',         d => artifactFill(d))
-    .attr('fill-opacity', 0.7)
+    .attr('fill-opacity', 1)
     .attr('stroke',       'none');
   restoreProgNodes();
 }
 
 function restoreProgNodes() {
   d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', 0.2)
+    .attr('fill-opacity', 1)
     .attr('stroke-width', 2);
 }
 
 function showArtifactTooltip(event, d) {
   const mInfo = PROGRAM_DATA.manifestations.find(m => m.id === d.targetManifestationId);
   const mColor = mInfo ? ploColor(mInfo.plos[0]) : '#888';
+
+  d3.selectAll('circle.artifact')
+    .attr('fill-opacity', n => n === d ? 1 : 0.2);
 
   d3.select(event.currentTarget)
     .attr('r', ARTIFACT_RADIUS_HOVER)
