@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Program Learning Outcomes — Monochrome</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Design Tokens ─────────────────────────────────── */
+    :root {
+      --bg:         #e6e0d4;
+      --surface:    #ede8de;
+      --surface2:   #ddd8ce;
+      --border:     #c4bfb4;
+      --text:       #1a1916;
+      --text-muted: #8a8780;
+      --radius:     4px;
+      --sidebar-w:  200px;
+      --header-h:   44px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    .app-header {
+      height: var(--header-h);
+      background: var(--text);
+      color: var(--bg);
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      flex-shrink: 0;
+      gap: 0.75rem;
+    }
+    .app-header h1 {
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .header-badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      font-weight: 400;
+      color: rgba(230,224,212,0.55);
+    }
+
+    /* ─── Body Layout ────────────────────────────────────── */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar-section {
+      padding: 0.85rem 0.85rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+    .sidebar-section h3 {
+      font-size: 0.55rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 0.55rem;
+    }
+    .filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      padding: 3px 4px;
+      border-radius: 3px;
+      transition: background 0.1s;
+      user-select: none;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item input[type="checkbox"] {
+      width: 12px; height: 12px;
+      accent-color: var(--text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .filter-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ─── Load CSV button ─────────────────────────────────── */
+    .btn-load {
+      display: block;
+      text-align: center;
+      background: var(--text);
+      color: var(--bg);
+      padding: 0.4rem 0.7rem;
+      border-radius: var(--radius);
+      font-size: 0.68rem;
+      font-family: inherit;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    .btn-load:hover { opacity: 0.8; }
+    .btn-load-wrap { padding: 0.7rem 0.85rem; }
+
+    /* ─── Canvas ─────────────────────────────────────────── */
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    #main-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ─── Program Graph Node Labels ──────────────────────── */
+    .prog-label {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 300;
+      pointer-events: none;
+      dominant-baseline: middle;
+      text-anchor: middle;
+      letter-spacing: 0.01em;
+    }
+    .prog-label--class {
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── Label visibility toggles ───────────────────────── */
+    #main-svg.hide-manifestation-labels .prog-node--manifestation { display: none; }
+    #main-svg.hide-class-labels .prog-node--class { display: none; }
+
+    /* ─── Artifact circles ────────────────────────────────── */
+    .artifact {
+      cursor: pointer;
+    }
+
+    /* ─── Tooltip ─────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: var(--text);
+      color: var(--bg);
+      border-radius: 3px;
+      padding: 0.75rem 0.9rem;
+      max-width: 280px;
+      min-width: 190px;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      pointer-events: none;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+      z-index: 200;
+      display: none;
+    }
+    #tooltip.visible { display: block; }
+
+    .tt-title   { font-weight: 500; font-size: 0.76rem; margin-bottom: 2px; }
+    .tt-meta    { font-size: 0.65rem; opacity: 0.55; margin-bottom: 6px; }
+    .tt-divider { border: none; border-top: 1px solid rgba(230,224,212,0.18); margin: 6px 0; }
+    .tt-excerpt {
+      font-size: 0.68rem;
+      opacity: 0.8;
+      line-height: 1.6;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tt-scores-label {
+      font-size: 0.6rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.55;
+      margin-bottom: 4px;
+    }
+
+    /* ─── PLO selector ───────────────────────────────────── */
+    .plo-select {
+      width: 100%;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.7rem;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      margin-bottom: 0.5rem;
+    }
+    .plo-description {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    /* ─── Legend ─────────────────────────────────────────── */
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .legend-ring {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--text);
+      flex-shrink: 0;
+    }
+    .legend-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text);
+      flex-shrink: 0;
+      margin: 0 5px;
+    }
+    .legend-dot-sm {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--text);
+      flex-shrink: 0;
+      margin: 0 6px;
+    }
+
+    /* ─── Scrollbar styling ──────────────────────────────── */
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Program Learning Outcomes</h1>
+  <span class="header-badge" id="artifact-count">0 instances</span>
+</header>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h3>Program Learning Outcome</h3>
+      <select id="plo-select" class="plo-select">
+        <option value="PLO1">PLO 1 — Socio-ecological</option>
+        <option value="PLO2">PLO 2 — Situated knowledge</option>
+      </select>
+      <p id="plo-description" class="plo-description"></p>
+    </div>
+    <div class="sidebar-section">
+      <h3>Legend</h3>
+      <div class="legend-item"><span class="legend-ring"></span> Manifestation (size = count)</div>
+      <div class="legend-item"><span class="legend-dot"></span> Class</div>
+      <div class="legend-item"><span class="legend-dot-sm"></span> Instance</div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Labels</h3>
+      <div class="filter-list">
+        <label class="filter-item">
+          <input type="checkbox" id="toggle-manifestation-labels" checked>
+          <span>Manifestations</span>
+        </label>
+        <label class="filter-item">
+          <input type="checkbox" id="toggle-class-labels" checked>
+          <span>Classes</span>
+        </label>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Authors</h3>
+      <div class="filter-list" id="author-filters"></div>
+    </div>
+    <div class="btn-load-wrap">
+      <label class="btn-load" for="csv-input">+ Load CSV</label>
+      <input type="file" id="csv-input" accept=".csv" style="display:none" />
+    </div>
+  </aside>
+
+  <main class="canvas-wrap" id="canvas-wrap">
+    <svg id="main-svg"></svg>
+    <div id="tooltip"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PROGRAM STRUCTURE
+   ═══════════════════════════════════════════════════════════ */
+const PROGRAM_DATA = {
+  classes: [
+    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',              plos: ['plo1'] },
+    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',              plos: ['plo1'] },
+    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',         plos: ['plo1'] },
+    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',         plos: ['plo1'] },
+    { id: 'des751',  title: 'DES 751 — Design Writing',                             plos: ['plo1'] },
+    { id: 'des730',  title: 'DES 730A/B — Transformation Design',                   plos: ['plo1'] },
+    { id: 'des741',  title: 'DES 741 — Cross-disciplinary Studio: Symbiotic Futures', plos: ['plo1'] },
+    { id: 'des796',  title: 'DES 796 — Thesis I',                                   plos: ['plo1'] },
+    { id: 'des797',  title: 'DES 797 — Thesis II',                                  plos: ['plo1'] }
+  ],
+  manifestations: [],
+  ploData: {}
+};
+
+/* ═══════════════════════════════════════════════════════════
+   NORMALIZE MANIFESTATIONS
+   ═══════════════════════════════════════════════════════════ */
+function normalizeManifestations(data, ploKey) {
+  let raw, plos;
+  if (ploKey && data[ploKey]) {
+    raw  = data[ploKey].manifestations || [];
+    plos = [ploKey.toLowerCase()];
+  } else {
+    raw  = Array.isArray(data) ? data : (data.manifestations || []);
+    plos = ['plo1'];
+  }
+
+  const CLASS_NAME_MAP = {
+    'DES 720A': 'des720a', 'DES 720B': 'des720b',
+    'DES 710A': 'des710a', 'DES 710B': 'des710b',
+    'DES 751':  'des751',  'DES 730A/B': 'des730',
+    'DES 741':  'des741',  'DES 796':  'des796',
+    'DES 797':  'des797'
+  };
+
+  return raw.map(m => {
+    const classes = (m.classes || []).map(c => CLASS_NAME_MAP[c] || c);
+    return {
+      id:          m.id,
+      title:       m.manifestation || m.title || m.id,
+      shortLabel:  m.short_label   || m.manifestation || m.title || m.id,
+      similar:     m.similar       || [],
+      plos:        m.plos || plos,
+      classes,
+      scoreColumn: ploKey ? `${ploKey}_${m.id}` : null,
+      _nodeRadius: 16   // default; recomputed by computeManifestationSizes()
+    };
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MONOCHROME COLOR SYSTEM
+   ═══════════════════════════════════════════════════════════ */
+const INK       = '#1a1916';
+const INK_FAINT = 'rgba(26,25,22,0.12)';
+
+function artifactFill()  { return INK; }
+function nodeColor()     { return INK; }
+function classColor()    { return INK; }
+function ploColor()      { return INK; }
+
+function nodeRadius(d) {
+  if (d.type === 'class')         return 9;
+  if (d.type === 'manifestation') return d._nodeRadius || 16;
+  return 7;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MANIFESTATION RING SIZES — computed from visible artifact counts
+   ═══════════════════════════════════════════════════════════ */
+function computeManifestationSizes() {
+  const counts = {};
+  getVisibleArtifacts().forEach(a => {
+    counts[a.targetManifestationId] = (counts[a.targetManifestationId] || 0) + 1;
+  });
+  const vals = Object.values(counts);
+  const maxCount = vals.length ? Math.max(...vals) : 1;
+  PROGRAM_DATA.manifestations.forEach(m => {
+    const c = counts[m.id] || 0;
+    // Ring radius: 12 (empty) → 48 (max), scaled by sqrt so differences are readable
+    m._nodeRadius = 12 + Math.sqrt(c / maxCount) * 36;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ARTIFACT SIZING
+   ═══════════════════════════════════════════════════════════ */
+const ARTIFACT_RADIUS           = 2;
+const ARTIFACT_RADIUS_HOVER     = 4;
+const ARTIFACT_COLLISION_RADIUS = 12;
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+const state = {
+  visibleClasses:        new Set(PROGRAM_DATA.classes.map(c => c.id)),
+  visibleAuthors:        new Set(),
+  allArtifacts:          [],
+  activeManifestationId: null,
+  activePlo:             'PLO1'
+};
+
+let svg, svgWidth, svgHeight, zoom;
+const SIM_W = 4000;
+const SIM_H = 4000;
+let sim1, sim2;
+let progLinkSel, progNodeSel, artNodeSel;
+let _programNodes = [], _programLinks = [], _manifestationNodes = [];
+let _artifactNodes = [];
+
+/* ═══════════════════════════════════════════════════════════
+   DATA PROCESSING
+   ═══════════════════════════════════════════════════════════ */
+const REQUIRED_COLS = ['author','thesis_title','paragraph'];
+
+function normalizeRow(r) {
+  const out = { ...r };
+  if (!out.class) out.class = 'des797';
+  return out;
+}
+
+function processData(rows, merge = false) {
+  const expanded = [];
+  rows.forEach(r => {
+    const base = normalizeRow(r);
+    PROGRAM_DATA.manifestations.forEach(m => {
+      if (!m.scoreColumn) return;
+      const score = +(base[m.scoreColumn]) || 0;
+      for (let i = 0; i < score; i++) {
+        expanded.push({
+          ...base,
+          _instanceIdx: i,
+          targetManifestationId: m.id,
+          targetScoreColumn: m.scoreColumn,
+          score
+        });
+      }
+    });
+  });
+
+  const offset = merge ? state.allArtifacts.length : 0;
+  expanded.forEach((a, i) => { a._uid = offset + i; });
+
+  if (merge) {
+    const existing = new Set(
+      state.allArtifacts.map(a =>
+        `${a.author}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a._instanceIdx}`
+      )
+    );
+    const fresh = expanded.filter(a =>
+      !existing.has(`${a.author}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a._instanceIdx}`)
+    );
+    state.allArtifacts = [...state.allArtifacts, ...fresh];
+    fresh.forEach(a => state.visibleAuthors.add(a.author));
+    fresh.forEach(a => { if (a.class) state.visibleClasses.add(a.class); });
+  } else {
+    state.allArtifacts = expanded;
+    const authors = [...new Set(expanded.map(a => a.author))];
+    authors.forEach(a => state.visibleAuthors.add(a));
+  }
+}
+
+function getVisibleArtifacts() {
+  return state.allArtifacts.filter(a =>
+    state.visibleClasses.has(a.class) &&
+    state.visibleAuthors.has(a.author)
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SVG SETUP
+   ═══════════════════════════════════════════════════════════ */
+function setupSVG() {
+  const wrap = document.getElementById('canvas-wrap');
+  svgWidth  = wrap.clientWidth;
+  svgHeight = wrap.clientHeight;
+
+  svg = d3.select('#main-svg')
+    .attr('width', svgWidth)
+    .attr('height', svgHeight);
+
+  const zoomLayer = svg.append('g').attr('id', 'zoom-layer');
+  zoomLayer.append('g').attr('id', 'layer-prog-links');
+  zoomLayer.append('g').attr('id', 'layer-art-nodes');
+  zoomLayer.append('g').attr('id', 'layer-prog-nodes');
+
+  zoom = d3.zoom()
+    .scaleExtent([0.15, 10])
+    .on('zoom', (event) => {
+      const { x, y, k } = event.transform;
+      zoomLayer.attr('transform', `translate(${x},${y}) scale(${k})`);
+    });
+
+  svg.call(zoom);
+  svg.on('dblclick.zoom', null);
+  svg.on('dblclick', () => svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity));
+
+  svg.on('click.clearHighlight touchend.clearHighlight', (event) => {
+    if (event.target === svg.node() || event.target === zoomLayer.node()) {
+      clearManifestationHighlight();
+    }
+  });
+
+  new ResizeObserver(() => {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
+    svgWidth = w; svgHeight = h;
+    svg.attr('width', svgWidth).attr('height', svgHeight);
+    if (sim1) sim1.alpha(0.2).restart();
+  }).observe(wrap);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM FORCES
+   ═══════════════════════════════════════════════════════════ */
+function boundaryForce(getWidth, getHeight, padding) {
+  let _nodes = [];
+  function force(alpha) {
+    const W = getWidth(), H = getHeight();
+    const strength = 0.18 * alpha;
+    _nodes.forEach(n => {
+      const r = (n.type ? nodeRadius(n) : ARTIFACT_RADIUS) + padding;
+      if (n.x < r)       n.vx += (r - n.x) * strength;
+      if (n.x > W - r)   n.vx -= (n.x - (W - r)) * strength;
+      if (n.y < r)       n.vy += (r - n.y) * strength;
+      if (n.y > H - r)   n.vy -= (n.y - (H - r)) * strength;
+    });
+  }
+  force.initialize = function(nodes) { _nodes = nodes; };
+  return force;
+}
+
+function manifestationCircleCollisionForce(manifestationNodes) {
+  let _nodes = [];
+  function force() {
+    _nodes.forEach(artifact => {
+      manifestationNodes.forEach(m => {
+        if (m.x == null || m.y == null) return;
+        const dx   = artifact.x - m.x;
+        const dy   = artifact.y - m.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const minDist = nodeRadius(m) + ARTIFACT_COLLISION_RADIUS;
+        if (dist < minDist) {
+          const push = (minDist - dist) / dist;
+          artifact.vx += dx * push * 0.6;
+          artifact.vy += dy * push * 0.6;
+        }
+      });
+    });
+  }
+  force.initialize = function(nodes) {
+    _nodes = nodes.filter(n => n.targetManifestationId);
+  };
+  return force;
+}
+
+function customAttractionForce(manifestationNodes) {
+  const mMap = new Map(manifestationNodes.map(m => [m.id, m]));
+  let _nodes = [];
+  function force(alpha) {
+    const ATTRACT_K = 0.4 * Math.min(1, (SIM_W * SIM_H) / (900 * 600));
+    _nodes.forEach(artifact => {
+      const mNode = mMap.get(artifact.targetManifestationId);
+      if (!mNode || mNode.x == null || mNode.y == null) return;
+
+      const dx   = mNode.x - artifact.x;
+      const dy   = mNode.y - artifact.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+      // Orbit just outside the ring edge
+      const targetDist = nodeRadius(mNode) + ARTIFACT_COLLISION_RADIUS * 0.5 + 4;
+      const tension = (dist - targetDist) / dist;
+
+      const s = tension * ATTRACT_K * alpha;
+      artifact.vx += dx * s;
+      artifact.vy += dy * s;
+    });
+  }
+  force.initialize = function(nodes) {
+    _nodes = nodes.filter(n => n.targetManifestationId);
+  };
+  return force;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CLASS CIRCLE POSITIONS
+   ═══════════════════════════════════════════════════════════ */
+function classCirclePos(classId) {
+  const classes = PROGRAM_DATA.classes;
+  const idx = classes.findIndex(c => c.id === classId);
+  if (idx < 0) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
+  const cx = SIM_W * 0.30;
+  const cy = SIM_H * 0.50;
+  const rx = SIM_W * 0.11;
+  const ry = SIM_H * 0.19;
+  const angle = (idx / classes.length) * 2 * Math.PI - Math.PI / 2;
+  return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 1 — Program Graph
+   ═══════════════════════════════════════════════════════════ */
+function buildProgramSimulation(visibleClasses) {
+  const classNodes = PROGRAM_DATA.classes
+    .filter(c => visibleClasses.has(c.id))
+    .map(c => ({ ...c, type: 'class' }));
+  const manifestationNodes = PROGRAM_DATA.manifestations
+    .filter(m => m.classes.some(cid => visibleClasses.has(cid)))
+    .map(m => ({ ...m, type: 'manifestation' }));
+
+  const nodes = [...classNodes, ...manifestationNodes];
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+  classNodes.forEach(n => {
+    const pos = classCirclePos(n.id);
+    n.x = pos.x; n.y = pos.y;
+  });
+
+  const links = [];
+  manifestationNodes.forEach(m =>
+    m.classes.forEach(cid => {
+      const src = nodeById.get(cid);
+      if (src) links.push({ source: src, target: m, linkType: 'manifestation' });
+    })
+  );
+
+  const seenPairs = new Set();
+  manifestationNodes.forEach(m => {
+    (m.similar || []).forEach(similarId => {
+      const target = nodeById.get(similarId);
+      if (!target) return;
+      const key = [m.id, similarId].sort().join('--');
+      if (seenPairs.has(key)) return;
+      seenPairs.add(key);
+      links.push({ source: m, target, linkType: 'similar' });
+    });
+  });
+
+  function centroidSpawn(classIds) {
+    const positions = (classIds || []).map(cid => classCirclePos(cid));
+    if (!positions.length) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
+    const ax = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const ay = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    return {
+      x: ax + (Math.random() - 0.5) * 28,
+      y: ay + (Math.random() - 0.5) * 28
+    };
+  }
+
+  if (sim1) {
+    const oldById = new Map(sim1.nodes().filter(n => n.type !== 'class').map(n => [n.id, n]));
+    manifestationNodes.forEach(n => {
+      const old = oldById.get(n.id);
+      if (old) { n.x = old.x; n.y = old.y; n.vx = old.vx || 0; n.vy = old.vy || 0; }
+      else {
+        const sp = centroidSpawn(n.classes);
+        n.x = sp.x; n.y = sp.y;
+      }
+    });
+  } else {
+    manifestationNodes.forEach(n => {
+      const sp = centroidSpawn(n.classes);
+      n.x = sp.x; n.y = sp.y;
+    });
+  }
+
+  if (sim1) sim1.stop();
+
+  const manifestDist = 160;
+
+  sim1 = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links)
+      .id(d => d.id)
+      .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
+      .strength(d => {
+        if (d.linkType === 'similar') return 1.5;
+        return d.target.classes?.length >= 2 ? 1.0 : 0.4;
+      }))
+    .force('charge', d3.forceManyBody()
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -60 : 0))
+    .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
+    .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
+    .force('collide', d3.forceCollide()
+      .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
+      .strength(0.8))
+    .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
+    .alphaDecay(0.005)
+    .velocityDecay(0.45)
+    .stop()
+    .on('tick', onTick);
+
+  return { nodes, links, manifestationNodes };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 2 — Artifacts
+   ═══════════════════════════════════════════════════════════ */
+function topManifestationFor(artifact, manifestationNodes) {
+  return manifestationNodes.find(m => m.id === artifact.targetManifestationId) || null;
+}
+
+function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
+  const oldById = sim2
+    ? new Map(sim2.nodes().map(n => [n._uid, { x: n.x, y: n.y, vx: n.vx, vy: n.vy }]))
+    : new Map();
+
+  visibleArtifacts.forEach(a => {
+    const old = oldById.get(a._uid);
+    if (old) {
+      a.x = old.x; a.y = old.y; a.vx = old.vx; a.vy = old.vy;
+    } else {
+      const top = topManifestationFor(a, manifestationNodes);
+      const bx = (top?.x != null && top.x > 10) ? top.x : SIM_W * 0.6 + Math.random() * SIM_W * 0.3;
+      const by = (top?.y != null) ? top.y : SIM_H * 0.2 + Math.random() * SIM_H * 0.6;
+      a.x = bx + (Math.random() - 0.5) * 60;
+      a.y = by + (Math.random() - 0.5) * 60;
+    }
+  });
+
+  if (sim2) sim2.stop();
+
+  sim2 = d3.forceSimulation(visibleArtifacts)
+    .force('attract',     customAttractionForce(manifestationNodes))
+    .force('mCollide',    manifestationCircleCollisionForce(manifestationNodes))
+    .force('collide',     d3.forceCollide(ARTIFACT_COLLISION_RADIUS).strength(0.75))
+    .force('charge',      d3.forceManyBody().strength(-2))
+    .force('boundary',    boundaryForce(() => SIM_W, () => SIM_H, 10))
+    .alphaDecay(0.003)
+    .velocityDecay(0.4)
+    .stop()
+    .on('tick', onTick);
+
+  return sim2;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TICK HANDLER
+   ═══════════════════════════════════════════════════════════ */
+function onTick() {
+  if (progLinkSel) {
+    progLinkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  }
+  if (progNodeSel) {
+    progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+  if (artNodeSel) {
+    artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DRAG
+   ═══════════════════════════════════════════════════════════ */
+function makeDrag(simulation) {
+  return d3.drag()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.2).restart();
+      if (sim2) sim2.alphaTarget(0.3).restart();
+      d.fx = d.x; d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x; d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      if (sim2) sim2.alphaTarget(0);
+      if (d.type !== 'plo') {
+        d.fx = null; d.fy = null;
+      }
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function wordsToLines(words, maxChars) {
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? current + ' ' + word : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+// Collision radius for manifestation nodes in sim1 — ring radius + orbit buffer
+function manifestationCollideRadius(d) {
+  return nodeRadius(d) + 24;
+}
+
+function wrapTextLabel(textNode, lines, lineH) {
+  const offsetY = -((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => {
+    const ts = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    ts.setAttribute('x', 0);
+    ts.setAttribute('dy', i === 0 ? offsetY : lineH);
+    ts.textContent = line;
+    textNode.appendChild(ts);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderAll() {
+  // ── Program Links ──────────────────────────────────────────
+  progLinkSel = svg.select('#layer-prog-links')
+    .selectAll('line.prog-link')
+    .data(_programLinks, d => `${d.source.id}--${d.target.id}`)
+    .join(
+      enter => enter.append('line')
+        .attr('class', 'prog-link')
+        .attr('stroke', d => d.linkType === 'similar'
+          ? 'rgba(26,25,22,0.07)'
+          : 'rgba(26,25,22,0.14)')
+        .attr('stroke-opacity', 1)
+        .attr('stroke-width', d => d.linkType === 'similar' ? 0.5 : 0.75),
+      update => update,
+      exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
+    );
+
+  // ── Program Nodes ──────────────────────────────────────────
+  progNodeSel = svg.select('#layer-prog-nodes')
+    .selectAll('g.prog-node')
+    .data(_programNodes, d => d.id)
+    .join(
+      enter => {
+        const g = enter.append('g')
+          .attr('class', d => `prog-node prog-node--${d.type}`)
+          .style('cursor', 'grab')
+          .call(makeDrag(sim1));
+
+        // Manifestation: hollow ring; Class: solid dot
+        g.append('circle')
+          .attr('class', 'node-circle')
+          .attr('r',            d => nodeRadius(d))
+          .attr('fill',         d => d.type === 'manifestation' ? 'none' : INK)
+          .attr('stroke',       INK)
+          .attr('stroke-width', d => d.type === 'manifestation' ? 1.5 : 0)
+          .attr('fill-opacity', 1);
+
+        // Class label
+        g.filter(d => d.type === 'class')
+          .append('text')
+          .attr('class', 'prog-label prog-label--class')
+          .attr('fill', INK)
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(230,224,212,0.9)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .each(function(d) {
+            const sep = d.title.indexOf(' — ');
+            const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
+            const name = sep >= 0 ? d.title.slice(sep + 3) : '';
+            wrapTextLabel(this, name ? [code, name] : [code], 11);
+          });
+
+        // Manifestation label
+        g.filter(d => d.type === 'manifestation')
+          .append('text')
+          .attr('class', 'prog-label')
+          .attr('fill', INK)
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(230,224,212,0.9)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .each(function(d) {
+            wrapTextLabel(this, wordsToLines(d.shortLabel.split(' '), 22), 14);
+          });
+
+        g.on('mouseover', showProgramTooltip)
+         .on('mouseleave', hideTooltip);
+
+        g.filter(d => d.type === 'manifestation')
+          .style('cursor', 'pointer')
+          .on('click.highlight touchend.highlight', (event, d) => {
+            event.stopPropagation();
+            if (state.activeManifestationId === d.id) {
+              clearManifestationHighlight();
+            } else {
+              highlightArtifactsForManifestation(d.id);
+            }
+          });
+
+        return g;
+      },
+      update => {
+        // Update ring radii when sizes recompute
+        update.select('circle')
+          .attr('r', d => nodeRadius(d));
+        return update;
+      },
+      exit => exit.transition().duration(250).attr('opacity', 0).remove()
+    );
+
+  renderArtifactNodes();
+  updateArtifactCount();
+}
+
+function renderArtifactNodes() {
+  artNodeSel = svg.select('#layer-art-nodes')
+    .selectAll('circle.artifact')
+    .data(_artifactNodes, d => d._uid)
+    .join(
+      enter => enter.append('circle')
+        .attr('class', 'artifact')
+        .attr('r', ARTIFACT_RADIUS)
+        .attr('fill', INK)
+        .attr('fill-opacity', 1)
+        .attr('stroke', 'none')
+        .attr('cx', d => d.x || SIM_W * 0.65)
+        .attr('cy', d => d.y || SIM_H * 0.5)
+        .on('mouseover', showArtifactTooltip)
+        .on('mouseleave', (event, d) => {
+          d3.select(event.currentTarget)
+            .attr('r', ARTIFACT_RADIUS)
+            .attr('fill', INK)
+            .attr('stroke', 'none')
+            .attr('fill-opacity', state.activeManifestationId
+              ? (d.targetManifestationId === state.activeManifestationId ? 1 : 0.15)
+              : 1);
+          hideTooltip();
+        }),
+      update => update,
+      exit   => exit.transition().duration(180)
+        .attr('r', 0)
+        .attr('fill-opacity', 0)
+        .remove()
+    );
+}
+
+function updateArtifactCount() {
+  document.getElementById('artifact-count').textContent =
+    `${_artifactNodes.length} instance${_artifactNodes.length !== 1 ? 's' : ''}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION STARTUP
+   ═══════════════════════════════════════════════════════════ */
+function startSimulations(includeProgram = true) {
+  if (includeProgram) {
+    sim1.alpha(1);
+    for (let i = 0; i < 120; i++) sim1.tick();
+    if (progLinkSel) {
+      progLinkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    }
+    if (progNodeSel) progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    sim1.alpha(0.4).restart();
+  }
+
+  sim2.alpha(1);
+  for (let i = 0; i < 60; i++) sim2.tick();
+  if (artNodeSel) artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  sim2.alpha(0.5).restart();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER ORCHESTRATION
+   ═══════════════════════════════════════════════════════════ */
+function updateFilters(authorOnly = false) {
+  computeManifestationSizes();
+
+  if (!authorOnly) {
+    const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+    _programNodes       = nodes;
+    _programLinks       = links;
+    _manifestationNodes = manifestationNodes;
+  }
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+  startSimulations(!authorOnly);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PLO SWITCHER
+   ═══════════════════════════════════════════════════════════ */
+function switchPlo(ploKey) {
+  state.activePlo = ploKey;
+  PROGRAM_DATA.manifestations = normalizeManifestations(PROGRAM_DATA.ploData, ploKey);
+  state.visibleClasses = new Set(
+    PROGRAM_DATA.manifestations.flatMap(m => m.classes)
+  );
+  clearManifestationHighlight();
+  computeManifestationSizes();
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+  renderAll();
+  startSimulations(true);
+  renderPloInfo();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════════════════ */
+function formatAuthorName(name) {
+  if (!name || !name.trim()) return null;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+
+function renderSidebar() {
+  renderPloInfo();
+  renderAuthorFilters();
+}
+
+let _ploSelectListenerAttached = false;
+function renderPloInfo() {
+  const sel  = document.getElementById('plo-select');
+  const desc = document.getElementById('plo-description');
+  if (!sel || !desc) return;
+  sel.value = state.activePlo;
+  desc.textContent = PROGRAM_DATA.ploData[state.activePlo]?.title || '';
+  if (!_ploSelectListenerAttached) {
+    sel.addEventListener('change', e => switchPlo(e.target.value));
+    _ploSelectListenerAttached = true;
+  }
+}
+
+function renderAuthorFilters() {
+  const container = document.getElementById('author-filters');
+  container.innerHTML = '';
+  const authors = [...new Set(state.allArtifacts.map(a => a.author))]
+    .filter(a => formatAuthorName(a) !== null)
+    .sort();
+  const timers = {};
+
+  authors.forEach(author => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.visibleAuthors.has(author);
+    cb.dataset.author = author;
+
+    label.addEventListener('click', e => {
+      e.preventDefault();
+      if (timers[author]) {
+        clearTimeout(timers[author]);
+        delete timers[author];
+        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))]
+          .filter(a => formatAuthorName(a) !== null);
+        const onlyThisSelected =
+          state.visibleAuthors.size === 1 && state.visibleAuthors.has(author);
+        if (onlyThisSelected) {
+          allAuthors.forEach(a => state.visibleAuthors.add(a));
+        } else {
+          state.visibleAuthors.clear();
+          state.visibleAuthors.add(author);
+        }
+        renderAuthorFilters();
+        updateFilters(true);
+      } else {
+        timers[author] = setTimeout(() => {
+          delete timers[author];
+          if (state.visibleAuthors.has(author)) state.visibleAuthors.delete(author);
+          else state.visibleAuthors.add(author);
+          cb.checked = state.visibleAuthors.has(author);
+          updateFilters(true);
+        }, 250);
+      }
+    });
+
+    const name = document.createElement('span');
+    name.textContent = formatAuthorName(author);
+    label.append(cb, name);
+    container.appendChild(label);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLTIPS
+   ═══════════════════════════════════════════════════════════ */
+const tooltipEl = document.getElementById('tooltip');
+
+function positionTooltip(event) {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const ttW = 280, ttH = tooltipEl.offsetHeight || 180;
+  const margin = 14;
+  let left = event.clientX - rect.left + margin;
+  let top  = event.clientY - rect.top  + margin;
+  if (left + ttW > rect.width  - 6) left = event.clientX - rect.left - ttW - margin;
+  if (top  + ttH > rect.height - 6) top  = event.clientY - rect.top  - ttH - margin;
+  tooltipEl.style.left = Math.max(0, left) + 'px';
+  tooltipEl.style.top  = Math.max(0, top)  + 'px';
+}
+
+function highlightArtifactsForManifestation(mId) {
+  state.activeManifestationId = mId;
+  d3.selectAll('circle.artifact')
+    .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
+    .attr('fill-opacity', d => d.targetManifestationId === mId ? 1 : 0.15);
+}
+
+function clearManifestationHighlight() {
+  state.activeManifestationId = null;
+  d3.selectAll('circle.artifact')
+    .attr('r',            ARTIFACT_RADIUS)
+    .attr('fill',         INK)
+    .attr('fill-opacity', 1)
+    .attr('stroke',       'none');
+}
+
+function restoreProgNodes() {
+  // no-op — prog nodes don't change on hover
+}
+
+function showArtifactTooltip(event, d) {
+  const mInfo = PROGRAM_DATA.manifestations.find(m => m.id === d.targetManifestationId);
+
+  d3.selectAll('circle.artifact')
+    .attr('fill-opacity', n => n === d ? 1 : 0.15);
+
+  d3.select(event.currentTarget)
+    .attr('r', ARTIFACT_RADIUS_HOVER)
+    .attr('fill', INK)
+    .attr('stroke', 'rgba(230,224,212,0.6)')
+    .attr('stroke-width', 1.5)
+    .attr('fill-opacity', 1);
+
+  const excerpt = (d.paragraph || '').trim();
+  const snippetLength = 220;
+  const snippet = excerpt.length > snippetLength ? excerpt.slice(0, snippetLength) + '…' : excerpt;
+
+  tooltipEl.innerHTML = `
+    <div class="tt-title">${formatAuthorName(d.author) || d.author}</div>
+    <div class="tt-meta">${d.thesis_title}</div>
+    <hr class="tt-divider">
+    <div class="tt-scores-label">${mInfo ? mInfo.title : d.targetManifestationId}</div>
+    <hr class="tt-divider">
+    <div class="tt-excerpt">${snippet}</div>`;
+
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function showProgramTooltip(event, d) {
+  const typeLabel = { class: 'Class', manifestation: 'Manifestation' }[d.type] || d.type;
+  const extra = d.type === 'manifestation'
+    ? `<div class="tt-meta">${Math.round(d._nodeRadius || 16)} radius · ${typeLabel}</div>`
+    : `<div class="tt-meta">${typeLabel}</div>`;
+  tooltipEl.innerHTML = `<div class="tt-title">${d.title}</div>${extra}`;
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILE PICKER
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('csv-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const rows = d3.csvParse(text);
+  if (!rows.length) { alert('CSV appears empty.'); return; }
+
+  const missing = REQUIRED_COLS.filter(c => !(c in rows[0]));
+  if (missing.length) {
+    alert(`CSV is missing required columns:\n${missing.join(', ')}`);
+    return;
+  }
+
+  processData(rows, true);
+  computeManifestationSizes();
+  renderSidebar();
+  updateFilters(false);
+  e.target.value = '';
+});
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+async function init() {
+  let csvText = null;
+  try {
+    const [csvRes, mRes] = await Promise.all([
+      fetch('./data/theses_counted.csv').catch(() => null),
+      fetch('./data/manifestations_similar.json').catch(() => null)
+    ]);
+    if (csvRes?.ok) csvText = await csvRes.text();
+    if (mRes?.ok) {
+      const data = await mRes.json();
+      PROGRAM_DATA.ploData = data;
+      PROGRAM_DATA.manifestations = normalizeManifestations(data, state.activePlo);
+    }
+  } catch (_) { /* file:// protocol */ }
+
+  const rows = d3.csvParse(csvText || '');
+  processData(rows, false);
+  computeManifestationSizes();
+
+  setupSVG();
+  renderSidebar();
+
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+  startSimulations();
+
+  const initScale = Math.min(svgWidth / SIM_W, svgHeight / SIM_H) * 2.5;
+  const focusX = SIM_W * 0.30;
+  const focusY = SIM_H * 0.50;
+  const tx = svgWidth  / 2 - focusX * initScale;
+  const ty = svgHeight / 2 - focusY * initScale;
+  svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initScale));
+}
+
+init();
+
+/* ═══════════════════════════════════════════════════════════
+   LABEL VISIBILITY TOGGLES
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('toggle-manifestation-labels').addEventListener('change', e => {
+  document.getElementById('main-svg').classList.toggle('hide-manifestation-labels', !e.target.checked);
+});
+document.getElementById('toggle-class-labels').addEventListener('change', e => {
+  document.getElementById('main-svg').classList.toggle('hide-class-labels', !e.target.checked);
+});
+</script>
+</body>
+</html>
