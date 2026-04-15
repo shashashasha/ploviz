@@ -327,17 +327,6 @@ function normalizeManifestations(data, ploKey) {
     'DES 797':  'des797'
   };
 
-  // Manifestation id → CSV score column (only the 7 themes scored in current artifacts.csv)
-  const SCORE_COL_MAP = {
-    'P1M01': 'score_material',
-    'P1M11': 'score_slowness',
-    'P1M12': 'score_environmental_crisis',
-    'P1M13': 'score_natural_world',
-    'P1M14': 'score_equitable_design',
-    'P1M15': 'score_stewardship',
-    'P1M16': 'score_more_than_human'
-  };
-
   return raw.map(m => {
     const classes = (m.classes || []).map(c => CLASS_NAME_MAP[c] || c);
     return {
@@ -345,7 +334,7 @@ function normalizeManifestations(data, ploKey) {
       title:       m.manifestation || m.title || m.id,
       plos:        m.plos || plos,
       classes,
-      scoreColumn: SCORE_COL_MAP[m.id] || null
+      scoreColumn: ploKey ? `${ploKey}_${m.id}` : null
     };
   });
 }
@@ -379,7 +368,7 @@ function initClassColors(ploKey = 'PLO1') {
 function classColor(classId) { return CLASS_COLORS[classId] || '#888'; }
 
 function artifactFill(d) {
-  const hasScore = PROGRAM_DATA.manifestations.some(m => (d[m.scoreColumn || m.id] || 0) > 0);
+  const hasScore = PROGRAM_DATA.manifestations.some(m => (d[m.scoreColumn || m.id] || 0) >= 5);
   return hasScore ? classColor(d.class) : '#b8b8b8';
 }
 
@@ -414,30 +403,10 @@ let _artifactNodes = [];
 /* ═══════════════════════════════════════════════════════════
    DATA PROCESSING
    ═══════════════════════════════════════════════════════════ */
-const SCORE_COLS = [
-  'score_slowness','score_material','score_environmental_crisis',
-  'score_natural_world','score_equitable_design','score_stewardship',
-  'score_more_than_human'
-];
 const REQUIRED_COLS = ['author','thesis_title','paragraph'];
 
-// Maps PLO-format CSV columns (new format) to the score_* columns the viz uses
-const PLO_TO_SCORE_MAP = {
-  'PLO1_P1M01': 'score_material',
-  'PLO1_P1M11': 'score_slowness',
-  'PLO1_P1M12': 'score_environmental_crisis',
-  'PLO1_P1M13': 'score_natural_world',
-  'PLO1_P1M14': 'score_equitable_design',
-  'PLO1_P1M15': 'score_stewardship',
-  'PLO1_P1M16': 'score_more_than_human'
-};
-
-// Accepts both old format (score_* columns + class) and new PLO format
 function normalizeRow(r) {
   const out = { ...r };
-  Object.entries(PLO_TO_SCORE_MAP).forEach(([ploCol, scoreCol]) => {
-    if (!(scoreCol in out) && ploCol in out) out[scoreCol] = out[ploCol];
-  });
   if (!out.class) out.class = 'des797';
   return out;
 }
@@ -445,7 +414,9 @@ function normalizeRow(r) {
 function processData(rows, merge = false) {
   const coerced = rows.map((r, i) => {
     const a = { ...normalizeRow(r), _uid: merge ? state.allArtifacts.length + i : i };
-    SCORE_COLS.forEach(col => { a[col] = +(a[col]) || 0; });
+    PROGRAM_DATA.manifestations.forEach(m => {
+      if (m.scoreColumn) a[m.scoreColumn] = +(a[m.scoreColumn]) || 0;
+    });
     return a;
   });
 
@@ -589,7 +560,7 @@ function customAttractionForce(manifestationNodes) {
       manifestationNodes.forEach(mNode => {
         if (mNode.x == null || mNode.y == null) return;
         const score = artifact[mNode.scoreColumn || mNode.id] || 0;
-        if (score <= 0) return;
+        if (score < 5) return;
 
         const weight  = score / 100;
         // Linear weight: even low scores pull meaningfully toward their manifestation

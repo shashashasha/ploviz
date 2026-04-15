@@ -3,15 +3,14 @@ import ssl
 import os
 
 PORT = 8443
-DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "force graph")
+base = os.path.dirname(os.path.abspath(__file__))
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DIRECTORY, **kwargs)
+        super().__init__(*args, directory=base, **kwargs)
 
-base = os.path.dirname(os.path.abspath(__file__))
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain(os.path.join(base, "certs/cert.pem"), os.path.join(base, "certs/key.pem"))
+context.load_cert_chain(os.path.join(base, "../certs/cert.pem"), os.path.join(base, "../certs/key.pem"))
 
 with http.server.HTTPServer(("0.0.0.0", PORT), Handler) as httpd:
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
