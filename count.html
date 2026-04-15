@@ -892,10 +892,9 @@ function renderAll() {
     .join(
       enter => enter.append('line')
         .attr('class', 'prog-link')
-        .attr('stroke', d => d.linkType === 'similar' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.18)')
+        .attr('stroke', d => d.linkType === 'similar' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.18)')
         .attr('stroke-opacity', 1)
-        .attr('stroke-width', d => d.linkType === 'similar' ? 0.5 : 1)
-        .attr('stroke-dasharray', d => d.linkType === 'similar' ? '3,5' : null),
+        .attr('stroke-width', d => d.linkType === 'similar' ? 0.5 : 1),
       update => update,
       exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
     );
