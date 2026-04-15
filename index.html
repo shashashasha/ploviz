@@ -706,7 +706,7 @@ function buildProgramSimulation(visibleClasses) {
       .id(d => d.id)
       .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
       .strength(d => {
-        if (d.linkType === 'similar') return 0;
+        if (d.linkType === 'similar') return 1.5;
         return d.target.classes?.length >= 2 ? 1.0 : 0.4;
       }))
     .force('charge', d3.forceManyBody()
