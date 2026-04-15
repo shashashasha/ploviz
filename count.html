@@ -912,10 +912,10 @@ function renderAll() {
 
         g.append('circle')
           .attr('class', 'node-circle')
-          .attr('r', d => d.type === 'class' ? 6 : nodeRadius(d))
-          .attr('fill', d => d.type === 'manifestation' ? '#fff' : '#000')
+          .attr('r', d => d.type === 'class' ? 6 : 8)
+          .attr('fill', '#000')
           .attr('fill-opacity', 1)
-          .attr('stroke', d => d.type === 'manifestation' ? '#000' : 'none')
+          .attr('stroke', d => d.type === 'manifestation' ? '#fff' : 'none')
           .attr('stroke-width', 2)
           .attr('filter', 'url(#node-shadow)');
 
@@ -994,27 +994,10 @@ function renderArtifactNodes() {
         .attr('cy', d => d.y || SIM_H * 0.5)
         .on('mouseover', showArtifactTooltip)
         .on('mouseleave', (event, d) => {
-          if (state.activeManifestationId) {
-            // Restore this artifact to the manifestation-highlight state
-            const mId = state.activeManifestationId;
-            const scored = (d[mId] || 0) > 0;
-            d3.select(event.currentTarget)
-              .attr('r',            scored ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
-              .attr('fill-opacity', scored ? 1    : 0.2)
-              .attr('stroke',       scored ? classColor(d.class) : 'none');
-            // Restore prog nodes to manifestation-highlight state (not full default)
-            d3.selectAll('g.prog-node').select('circle')
-              .attr('fill-opacity', nd => nd.type === 'class' ? .2 : (nd.id === mId ? 1 : 0.1))
-              .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
-          } else {
-            d3.selectAll('circle.artifact')
-              .attr('fill-opacity', 1);
-            d3.select(event.currentTarget)
-              .attr('r', ARTIFACT_RADIUS)
-              .attr('fill', artifactFill(d))
-              .attr('stroke', 'none');
-            restoreProgNodes();
-          }
+          d3.select(event.currentTarget)
+            .attr('r', ARTIFACT_RADIUS)
+            .attr('fill', artifactFill(d))
+            .attr('stroke', 'none');
           hideTooltip();
         }),
       update => update.attr('fill', d => artifactFill(d)),
@@ -1220,9 +1203,6 @@ function highlightArtifactsForManifestation(mId) {
     .attr('fill-opacity', d => d.targetManifestationId === mId ? 1 : 0.2)
     .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
     .attr('stroke-width', 1.5);
-  d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
-    .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
 }
 
 function clearManifestationHighlight() {
@@ -1232,13 +1212,10 @@ function clearManifestationHighlight() {
     .attr('fill',         d => artifactFill(d))
     .attr('fill-opacity', 1)
     .attr('stroke',       'none');
-  restoreProgNodes();
 }
 
 function restoreProgNodes() {
-  d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', 1)
-    .attr('stroke-width', 2);
+  // prog nodes (Class/Manifestation) no longer change on hover — no-op
 }
 
 function showArtifactTooltip(event, d) {
@@ -1253,11 +1230,6 @@ function showArtifactTooltip(event, d) {
     .attr('stroke', mColor)
     .attr('stroke-width', 2)
     .attr('fill-opacity', 1);
-
-  // Highlight just the target manifestation node, dim all others
-  d3.selectAll('g.prog-node').select('circle')
-    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === d.targetManifestationId ? 1 : 0.1))
-    .attr('stroke-width', nd => nd.id === d.targetManifestationId ? 4 : 2);
 
   const excerpt = (d.paragraph || '').trim();
   const snippetLength = 220;
