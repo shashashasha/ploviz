@@ -1261,7 +1261,7 @@ async function init() {
   let csvText = null;
   try {
     const [csvRes, mRes] = await Promise.all([
-      fetch('./data/artifacts.csv').catch(() => null),
+      fetch('./data/theses_counted.csv').catch(() => null),
       fetch('./data/manifestations.json').catch(() => null)
     ]);
     if (csvRes?.ok) csvText = await csvRes.text();
