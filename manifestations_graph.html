@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLO1 Manifestations Graph</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #f2efe8;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      overflow: hidden;
+    }
+    #chart { width: 100vw; height: 100vh; }
+
+    .node-label {
+      fill: #1a1a1a;
+      font-size: 10px;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 400;
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: hanging;
+      letter-spacing: 0.01em;
+    }
+
+    #tooltip {
+      position: absolute;
+      background: rgba(242,239,232,0.96);
+      border: 1px solid #c8c2b4;
+      color: #1a1a1a;
+      font-size: 12px;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      padding: 9px 13px;
+      border-radius: 2px;
+      pointer-events: none;
+      max-width: 270px;
+      line-height: 1.5;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    #tooltip .tip-id   { color: #888; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+    #tooltip .tip-label { font-weight: 600; margin-bottom: 3px; font-size: 13px; }
+    #tooltip .tip-full  { color: #555; font-size: 11px; }
+
+    #title {
+      position: absolute;
+      top: 20px; left: 26px;
+      color: rgba(30,28,24,0.45);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      pointer-events: none;
+    }
+    #legend {
+      position: absolute;
+      bottom: 20px; right: 26px;
+      color: rgba(30,28,24,0.45);
+      font-size: 9.5px;
+      line-height: 1.9;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+    }
+    .leg-row { display: flex; align-items: center; gap: 7px; }
+    .leg-line { height: 1px; width: 26px; background: rgba(30,28,24,0.25); }
+    .leg-line.s3 { background: rgba(30,28,24,0.4); height: 1.5px; }
+    .leg-line.s4 { background: rgba(30,28,24,0.6); height: 2px; }
+    .leg-line.s5 { background: rgba(30,28,24,0.8); height: 2.5px; }
+  </style>
+</head>
+<body>
+<div id="title">PLO 1 — Socio-Ecologically Sustainable Processes</div>
+<svg id="chart"></svg>
+<div id="tooltip">
+  <div class="tip-id"  id="tt-id"></div>
+  <div class="tip-label" id="tt-label"></div>
+  <div class="tip-full"  id="tt-full"></div>
+</div>
+<div id="legend">
+  <div style="margin-bottom:5px; color:rgba(30,28,24,0.55); font-size:9px; letter-spacing:0.12em; text-transform:uppercase;">Similarity</div>
+  <div class="leg-row"><div class="leg-line"></div> Low (2)</div>
+  <div class="leg-row"><div class="leg-line s3"></div> Medium (3)</div>
+  <div class="leg-row"><div class="leg-line s4"></div> High (4)</div>
+  <div class="leg-row"><div class="leg-line s5"></div> Very High (5)</div>
+</div>
+
+<script>
+const GRAPH = {"nodes":[{"id":"P1M01","label":"Material Constraints","full":"Material considerations and constraints"},{"id":"P1M02","label":"Waste Reduction","full":"Waste reduction and waste as a design flaw"},{"id":"P1M03","label":"Mindful Materials","full":"Mindful material use: ecological sustainability, resource availability, and reducing material overdependence"},{"id":"P1M04","label":"Ecological Entanglement","full":"Environmental awareness and entanglement with ecological systems"},{"id":"P1M05","label":"Core Principles","full":"Underlying principles that inform the work"},{"id":"P1M06","label":"AI Ethics","full":"Critical engagement with the ethics of AI"},{"id":"P1M07","label":"Pollution Remediation","full":"Pollution: proposals to reduce harmful manufacturing byproducts; projects that remediate the environment"},{"id":"P1M08","label":"Energy Footprint","full":"Energy consumption: projects consider the energy consumption of technologies used in making the work"},{"id":"P1M09","label":"Emerging Processes","full":"Emerging processes: projects research, experiment with, analyze, and/or criticize new manufacturing processes and modes of production"},{"id":"P1M10","label":"Historical Reflection","full":"History: projects connect to historical ways of being/doing; projects reflect on environmental and/or demographic change over time"},{"id":"P1M11","label":"Slow Practice","full":"Slowness (deep listening, sustainable pacing, long-term thinking, somatics)"},{"id":"P1M12","label":"Environmental Crisis","full":"Content that engages the current environmental crisis"},{"id":"P1M13","label":"Nature Relations","full":"Examining our relationship to the natural world"},{"id":"P1M14","label":"Equitable Design","full":"Design for an equitable and just society"},{"id":"P1M15","label":"Ecological Stewardship","full":"Care and stewardship for living systems, the environment, and the nonhuman world"},{"id":"P1M16","label":"More-than-Human","full":"Considering more than human stakeholders (ecosystems, animals, weather systems, materiality)"},{"id":"P1M17","label":"DIY Ethos","full":"DIY ethos"},{"id":"P1M18","label":"Low-Cost Production","full":"Low-cost production"},{"id":"P1M19","label":"Journal Practice","full":"Diary and journal-inspired practices"},{"id":"P1M20","label":"Generative Play","full":"Generative methodologies: workshops, annotated collage, and material play"},{"id":"P1M21","label":"Open Knowledge","full":"Accessibility of knowledge sources"},{"id":"P1M22","label":"Speculative Methods","full":"Speculative projects as methodologies for interpreting emerging ideas"},{"id":"P1M23","label":"Community Modification","full":"Modification to existing service, environment, or artifact that reflects needs of community"},{"id":"P1M24","label":"Expert Dialogue","full":"Preparation of open-ended questions; structured conversation with someone of deep knowledge"},{"id":"P1M25","label":"Field Research","full":"In-situ, dynamic field research involving a participant"},{"id":"P1M26","label":"Outsider Observation","full":"Photographs, textures, and video of social rituals as outsider, not insider"},{"id":"P1M27","label":"Unobtrusive Engagement","full":"Unobtrusive interaction or engagement using Spradley's 9 Dimensions"},{"id":"P1M28","label":"Data Citations","full":"Annotations and citations: census data, GIS, academic articles"},{"id":"P1M29","label":"Interview Spectrum","full":"Man-on-the-street vs expert: formal, semi-formal, and informal approaches"},{"id":"P1M30","label":"Behavioral Mapping","full":"Observational mapping and behavioral zoning"},{"id":"P1M31","label":"Assumption Breaking","full":"Exploring unfamiliar people and locations to break assumptions"},{"id":"P1M32","label":"Non-Materiality","full":"Material transcendence and explorations of non-materiality"},{"id":"P1M33","label":"Creative Resilience","full":"Resilience (sustained creative engagement, adaptive resilience, reflective practice, ability to work with complexity, capacity to navigate uncertainty, upholding of ethics and integrity)"},{"id":"P1M34","label":"Collaborative Community","full":"Community engagement and collaborative dialogue (co-authorship, co-research, co-leadership)"},{"id":"P1M35","label":"Site Specificity","full":"Site-specific inquiry (culturally, geographically, ecologically)"},{"id":"P1M36","label":"Positionality","full":"Positionality and students locating themselves as subjects of and within their own work"},{"id":"P1M37","label":"Sustained Practice","full":"Sustained and systematic practice (continued commitment to body of work from Thesis I)"}],"edges":[{"source":"P1M01","target":"P1M02","score":2},{"source":"P1M01","target":"P1M03","score":2},{"source":"P1M01","target":"P1M07","score":2},{"source":"P1M01","target":"P1M08","score":2},{"source":"P1M01","target":"P1M15","score":2},{"source":"P1M01","target":"P1M17","score":2},{"source":"P1M01","target":"P1M18","score":2},{"source":"P1M01","target":"P1M20","score":2},{"source":"P1M01","target":"P1M32","score":4},{"source":"P1M02","target":"P1M03","score":4},{"source":"P1M02","target":"P1M07","score":4},{"source":"P1M02","target":"P1M08","score":4},{"source":"P1M02","target":"P1M15","score":2},{"source":"P1M03","target":"P1M07","score":4},{"source":"P1M03","target":"P1M08","score":4},{"source":"P1M03","target":"P1M15","score":2},{"source":"P1M04","target":"P1M07","score":2},{"source":"P1M04","target":"P1M08","score":2},{"source":"P1M04","target":"P1M12","score":4},{"source":"P1M04","target":"P1M13","score":5},{"source":"P1M04","target":"P1M15","score":5},{"source":"P1M04","target":"P1M16","score":4},{"source":"P1M05","target":"P1M33","score":5},{"source":"P1M05","target":"P1M37","score":4},{"source":"P1M06","target":"P1M09","score":4},{"source":"P1M06","target":"P1M10","score":2},{"source":"P1M07","target":"P1M08","score":4},{"source":"P1M07","target":"P1M12","score":2},{"source":"P1M07","target":"P1M13","score":2},{"source":"P1M07","target":"P1M15","score":3},{"source":"P1M08","target":"P1M12","score":2},{"source":"P1M08","target":"P1M13","score":2},{"source":"P1M08","target":"P1M15","score":3},{"source":"P1M09","target":"P1M10","score":2},{"source":"P1M10","target":"P1M35","score":2},{"source":"P1M10","target":"P1M36","score":2},{"source":"P1M11","target":"P1M15","score":3},{"source":"P1M12","target":"P1M13","score":4},{"source":"P1M12","target":"P1M15","score":4},{"source":"P1M12","target":"P1M16","score":3},{"source":"P1M13","target":"P1M15","score":5},{"source":"P1M13","target":"P1M16","score":5},{"source":"P1M13","target":"P1M32","score":3},{"source":"P1M14","target":"P1M34","score":3},{"source":"P1M15","target":"P1M16","score":5},{"source":"P1M15","target":"P1M32","score":3},{"source":"P1M16","target":"P1M32","score":3},{"source":"P1M17","target":"P1M18","score":4},{"source":"P1M17","target":"P1M20","score":3},{"source":"P1M17","target":"P1M21","score":3},{"source":"P1M17","target":"P1M22","score":2},{"source":"P1M17","target":"P1M32","score":2},{"source":"P1M18","target":"P1M20","score":2},{"source":"P1M18","target":"P1M21","score":3},{"source":"P1M18","target":"P1M32","score":2},{"source":"P1M19","target":"P1M36","score":2},{"source":"P1M20","target":"P1M22","score":2},{"source":"P1M20","target":"P1M32","score":2},{"source":"P1M23","target":"P1M34","score":4},{"source":"P1M23","target":"P1M35","score":3},{"source":"P1M24","target":"P1M25","score":2},{"source":"P1M24","target":"P1M26","score":2},{"source":"P1M24","target":"P1M27","score":2},{"source":"P1M24","target":"P1M28","score":2},{"source":"P1M24","target":"P1M29","score":3},{"source":"P1M24","target":"P1M30","score":2},{"source":"P1M24","target":"P1M34","score":2},{"source":"P1M25","target":"P1M26","score":4},{"source":"P1M25","target":"P1M27","score":4},{"source":"P1M25","target":"P1M28","score":2},{"source":"P1M25","target":"P1M29","score":3},{"source":"P1M25","target":"P1M30","score":4},{"source":"P1M25","target":"P1M31","score":3},{"source":"P1M26","target":"P1M27","score":5},{"source":"P1M26","target":"P1M28","score":2},{"source":"P1M26","target":"P1M29","score":3},{"source":"P1M26","target":"P1M30","score":5},{"source":"P1M26","target":"P1M31","score":5},{"source":"P1M27","target":"P1M28","score":2},{"source":"P1M27","target":"P1M29","score":3},{"source":"P1M27","target":"P1M30","score":5},{"source":"P1M27","target":"P1M31","score":5},{"source":"P1M28","target":"P1M30","score":3},{"source":"P1M29","target":"P1M30","score":3},{"source":"P1M29","target":"P1M31","score":3},{"source":"P1M30","target":"P1M31","score":4},{"source":"P1M33","target":"P1M37","score":4},{"source":"P1M34","target":"P1M35","score":3},{"source":"P1M35","target":"P1M36","score":2}]};
+
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+const svg = d3.select('#chart').attr('width', W).attr('height', H);
+const defs = svg.append('defs');
+
+// ── Ink blob filter (feTurbulence + feDisplacementMap = organic edge) ──────
+const blobFilter = defs.append('filter').attr('id', 'blob').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+blobFilter.append('feTurbulence').attr('type','turbulence').attr('baseFrequency','0.07').attr('numOctaves','3').attr('seed','8').attr('result','noise');
+blobFilter.append('feDisplacementMap').attr('in','SourceGraphic').attr('in2','noise').attr('scale','2.8').attr('xChannelSelector','R').attr('yChannelSelector','G');
+
+// ── Subtle paper texture (very light noise over background) ────────────────
+const paperFilter = defs.append('filter').attr('id','paper').attr('x','0%').attr('y','0%').attr('width','100%').attr('height','100%');
+paperFilter.append('feTurbulence').attr('type','fractalNoise').attr('baseFrequency','0.65').attr('numOctaves','3').attr('stitchTiles','stitch').attr('result','noise');
+paperFilter.append('feColorMatrix').attr('type','saturate').attr('values','0').attr('result','grayNoise');
+paperFilter.append('feBlend').attr('in','SourceGraphic').attr('in2','grayNoise').attr('mode','multiply').attr('result','blend');
+paperFilter.append('feComponentTransfer').append('feFuncA').attr('type','linear').attr('slope','1');
+
+// ── Background ─────────────────────────────────────────────────────────────
+svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#ede9e0');
+// Paper grain overlay
+svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'transparent').attr('filter', 'url(#paper)').attr('opacity', 0.18);
+
+const g = svg.append('g');
+
+// Zoom / pan
+svg.call(d3.zoom().scaleExtent([0.25, 5]).on('zoom', e => g.attr('transform', e.transform)));
+
+// ── Weighted degree ────────────────────────────────────────────────────────
+const wDeg = {};
+GRAPH.nodes.forEach(n => { wDeg[n.id] = 0; });
+GRAPH.edges.forEach(e => {
+  wDeg[e.source] = (wDeg[e.source] || 0) + e.score;
+  wDeg[e.target] = (wDeg[e.target] || 0) + e.score;
+});
+
+const wVals  = Object.values(wDeg);
+const minWD  = Math.min(...wVals);
+const maxWD  = Math.max(...wVals);
+const minR   = 30;
+const maxR   = Math.min(W, H) * 0.42;
+
+function targetR(id) {
+  const norm = (wDeg[id] - minWD) / (maxWD - minWD);
+  return minR + (1 - norm) * (maxR - minR);
+}
+
+// ── Simulation ─────────────────────────────────────────────────────────────
+const scoreDist = { 2: 200, 3: 140, 4: 85, 5: 48 };
+
+const simulation = d3.forceSimulation(GRAPH.nodes)
+  .force('link', d3.forceLink(GRAPH.edges)
+    .id(d => d.id)
+    .distance(d => scoreDist[d.score] || 170)
+    .strength(d => d.score * 0.025))
+  .force('charge', d3.forceManyBody().strength(-260))
+  .force('center', d3.forceCenter(W / 2, H / 2).strength(0.04))
+  .force('radial', d3.forceRadial(d => targetR(d.id), W / 2, H / 2).strength(0.6))
+  .force('collision', d3.forceCollide(40));
+
+// ── Seeded jitter per edge (deterministic curve offsets) ───────────────────
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  return h;
+}
+function seededRand(edge) {
+  const h = hashStr(edge.source + edge.target);
+  return ((h >>> 0) % 1000) / 1000; // 0..1
+}
+
+// ── Edges as quadratic bezier paths ───────────────────────────────────────
+const edgeG = g.append('g').attr('class', 'edges');
+const edgeSel = edgeG.selectAll('path')
+  .data(GRAPH.edges)
+  .join('path')
+  .attr('fill', 'none')
+  .attr('stroke', d => {
+    const t = (d.score - 2) / 3; // 0..1
+    const light = 210, dark = 30;
+    const v = Math.round(light + (dark - light) * t);
+    return `rgb(${v},${v},${v})`;
+  })
+  .attr('stroke-width', d => 0.5 + (d.score - 2) * 0.45)
+  .attr('opacity', d => 0.35 + (d.score - 2) * 0.18)
+  .attr('stroke-linecap', 'round');
+
+// ── Nodes ──────────────────────────────────────────────────────────────────
+const nodeG = g.append('g').attr('class', 'nodes');
+const nodeSel = nodeG.selectAll('g')
+  .data(GRAPH.nodes)
+  .join('g')
+  .attr('class', 'node-group')
+  .call(d3.drag()
+    .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+    .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+    .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+// Dot: sized by wDeg, styled as ink blob via SVG filter
+nodeSel.append('circle')
+  .attr('r', d => 3.2 + Math.sqrt(wDeg[d.id]) * 0.38)
+  .attr('fill', '#1c1a17')
+  .attr('filter', 'url(#blob)')
+  .attr('cursor', 'pointer')
+  .on('mouseover', (ev, d) => {
+    const tt = document.getElementById('tooltip');
+    document.getElementById('tt-id').textContent    = `${d.id}  ·  weight: ${wDeg[d.id]}`;
+    document.getElementById('tt-label').textContent  = d.label;
+    document.getElementById('tt-full').textContent   = d.full;
+    tt.style.display = 'block';
+    tt.style.left = (ev.pageX + 15) + 'px';
+    tt.style.top  = (ev.pageY - 12) + 'px';
+  })
+  .on('mousemove', ev => {
+    const tt = document.getElementById('tooltip');
+    tt.style.left = (ev.pageX + 15) + 'px';
+    tt.style.top  = (ev.pageY - 12) + 'px';
+  })
+  .on('mouseout', () => { document.getElementById('tooltip').style.display = 'none'; });
+
+// Labels: wrap to ~13 chars, appear below node
+function wrapLabel(text, max) {
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  words.forEach(w => {
+    const test = cur ? cur + ' ' + w : w;
+    if (test.length > max) { if (cur) lines.push(cur); cur = w; }
+    else cur = test;
+  });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+nodeSel.each(function(d) {
+  const lines = wrapLabel(d.label, 13);
+  const grp = d3.select(this);
+  const dotR = 3.2 + Math.sqrt(wDeg[d.id]) * 0.38;
+  const lineH = 12;
+  lines.forEach((line, i) => {
+    grp.append('text')
+      .attr('class', 'node-label')
+      .attr('dy', dotR + 5 + i * lineH)
+      .attr('opacity', 0.75)
+      .text(line);
+  });
+});
+
+// ── Tick: update bezier paths + node positions ─────────────────────────────
+simulation.on('tick', () => {
+  edgeSel.attr('d', d => {
+    const sx = d.source.x, sy = d.source.y;
+    const tx = d.target.x, ty = d.target.y;
+    // Perpendicular offset for gentle organic curve
+    const dx = tx - sx, dy = ty - sy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    // Signed perpendicular based on seeded random (consistent per edge)
+    const sign = seededRand(d) > 0.5 ? 1 : -1;
+    const mag  = (seededRand(d) - 0.5) * len * 0.22 * sign;
+    const cx = (sx + tx) / 2 + (-dy / len) * mag;
+    const cy = (sy + ty) / 2 + ( dx / len) * mag;
+    return `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`;
+  });
+
+  nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+</script>
+</body>
+</html>
