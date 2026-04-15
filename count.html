@@ -506,18 +506,6 @@ function setupSVG() {
     .on('zoom', (event) => {
       const { x, y, k } = event.transform;
       zoomLayer.attr('transform', `translate(${x},${y}) scale(${k})`);
-      // Counter-scale text so labels stay the same screen size
-      svg.selectAll('.prog-label').attr('font-size', function() {
-        const base = parseFloat(d3.select(this).attr('data-base-size') || this.getAttribute('font-size') || 7);
-        d3.select(this).attr('data-base-size', base);
-        return `${base / k}px`;
-      });
-      // Also counter-scale label dy (distance below node stays consistent)
-      svg.selectAll('.prog-label').attr('dy', function() {
-        const base = parseFloat(d3.select(this).attr('data-base-dy') || this.getAttribute('dy') || 0);
-        d3.select(this).attr('data-base-dy', base);
-        return base / k;
-      });
     });
 
   svg.call(zoom);
