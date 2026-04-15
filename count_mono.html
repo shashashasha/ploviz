@@ -325,13 +325,13 @@
    ═══════════════════════════════════════════════════════════ */
 const PROGRAM_DATA = {
   classes: [
-    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',              plos: ['plo1'] },
-    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',              plos: ['plo1'] },
-    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',         plos: ['plo1'] },
-    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',         plos: ['plo1'] },
+    { id: 'des720a', title: 'DES 720A — Technology A',              plos: ['plo1'] },
+    { id: 'des720b', title: 'DES 720B — Technology B',              plos: ['plo1'] },
+    { id: 'des710a', title: 'DES 710A — Visual Language A',         plos: ['plo1'] },
+    { id: 'des710b', title: 'DES 710B — Visual Language B',         plos: ['plo1'] },
     { id: 'des751',  title: 'DES 751 — Design Writing',                             plos: ['plo1'] },
     { id: 'des730',  title: 'DES 730A/B — Transformation Design',                   plos: ['plo1'] },
-    { id: 'des741',  title: 'DES 741 — Cross-disciplinary Studio: Symbiotic Futures', plos: ['plo1'] },
+    { id: 'des741',  title: 'DES 741 — Studio: Symbiotic Futures', plos: ['plo1'] },
     { id: 'des796',  title: 'DES 796 — Thesis I',                                   plos: ['plo1'] },
     { id: 'des797',  title: 'DES 797 — Thesis II',                                  plos: ['plo1'] }
   ],
@@ -588,6 +588,61 @@ function manifestationCircleCollisionForce(manifestationNodes) {
   return force;
 }
 
+// Collision force where each artifact's personal space grows the farther it drifts
+// from its manifestation ring edge — tight packing near the ring, looser further out.
+// Grouped by manifestation so collision is only computed within each cluster (fast).
+function distanceScaledCollisionForce(manifestationNodes) {
+  const mMap        = new Map(manifestationNodes.map(m => [m.id, m]));
+  const nodesByManif = new Map();
+
+  function collisionR(a, mNode) {
+    if (!mNode || a.x == null || mNode.x == null) return ARTIFACT_COLLISION_RADIUS;
+    const dx = a.x - mNode.x;
+    const dy = a.y - mNode.y;
+    const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+    const distBeyondRing = Math.max(0, distFromCenter - nodeRadius(mNode));
+    // At the ring surface → radius ≈ 2.5px (tight); grows 0.14px per pixel further out
+    return Math.max(ARTIFACT_RADIUS + 0.5, 2.5 + distBeyondRing * 0.14);
+  }
+
+  function force() {
+    const str = 0.55;
+    nodesByManif.forEach((cluster, mId) => {
+      const mNode = mMap.get(mId);
+      for (let i = 0; i < cluster.length; ++i) {
+        const a  = cluster[i];
+        const ra = collisionR(a, mNode);
+        for (let j = i + 1; j < cluster.length; ++j) {
+          const b    = cluster[j];
+          const rb   = collisionR(b, mNode);
+          const minD = ra + rb;
+          const dx   = b.x - a.x;
+          const dy   = b.y - a.y;
+          const d2   = dx * dx + dy * dy;
+          if (d2 < minD * minD && d2 > 0) {
+            const d    = Math.sqrt(d2);
+            const push = ((minD - d) / d) * str * 0.5;
+            a.vx -= dx * push;  a.vy -= dy * push;
+            b.vx += dx * push;  b.vy += dy * push;
+          }
+        }
+      }
+    });
+  }
+
+  force.initialize = function(nodes) {
+    nodesByManif.clear();
+    nodes.forEach(n => {
+      if (!n.targetManifestationId) return;
+      let arr = nodesByManif.get(n.targetManifestationId);
+      if (!arr) { arr = []; nodesByManif.set(n.targetManifestationId, arr); }
+      arr.push(n);
+    });
+  };
+
+  return force;
+}
+
 function customAttractionForce(manifestationNodes) {
   const mMap = new Map(manifestationNodes.map(m => [m.id, m]));
   let _nodes = [];
@@ -719,9 +774,23 @@ function buildProgramSimulation(visibleClasses) {
     .force('charge', d3.forceManyBody()
       .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -260 : 0))
     .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : SIM_W * 0.30)
-      .strength(d => d.type === 'class' ? 0.06 : 0.015))
+      .strength(d => {
+        if (d.type === 'class') return 0.06;
+        if (d.type === 'manifestation') {
+          // Bigger ring (more artifacts) → stronger pull to center
+          // _nodeRadius range [12, 48]; maps to strength [0.006, 0.05]
+          return 0.006 + Math.max(0, (d._nodeRadius || 12) - 12) / 36 * 0.044;
+        }
+        return 0;
+      }))
     .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : SIM_H * 0.50)
-      .strength(d => d.type === 'class' ? 0.06 : 0.015))
+      .strength(d => {
+        if (d.type === 'class') return 0.06;
+        if (d.type === 'manifestation') {
+          return 0.006 + Math.max(0, (d._nodeRadius || 12) - 12) / 36 * 0.044;
+        }
+        return 0;
+      }))
     .force('collide', d3.forceCollide()
       .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
       .strength(0.8))
@@ -764,8 +833,9 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
   sim2 = d3.forceSimulation(visibleArtifacts)
     .force('attract',     customAttractionForce(manifestationNodes))
     .force('mCollide',    manifestationCircleCollisionForce(manifestationNodes))
-    .force('collide',     d3.forceCollide(ARTIFACT_COLLISION_RADIUS).strength(0.75))
-    .force('charge',      d3.forceManyBody().strength(-2))
+    .force('distCollide', distanceScaledCollisionForce(manifestationNodes))
+    .force('collide',     d3.forceCollide(ARTIFACT_RADIUS + 1).strength(0.4)) // minimal cross-cluster separation
+    .force('charge',      d3.forceManyBody().strength(-1))
     .force('boundary',    boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.003)
     .velocityDecay(0.4)
