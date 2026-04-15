@@ -380,9 +380,11 @@ function nodeRadius(d) {
   return 7;
 }
 
-// count.html uses larger artifact nodes (3× the base 3.5)
-const ARTIFACT_RADIUS       = 5;
-const ARTIFACT_RADIUS_HOVER = 8;
+// count.html artifact sizing — visual radius kept small, collision radius
+// kept large so nodes spread out with clear space between them.
+const ARTIFACT_RADIUS           = 3;    // rendered circle size
+const ARTIFACT_RADIUS_HOVER     = 5;    // rendered circle size on hover
+const ARTIFACT_COLLISION_RADIUS = 18;   // personal-space bubble for force collision
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -564,7 +566,7 @@ function manifestationCircleCollisionForce(manifestationNodes) {
         const dx   = artifact.x - m.x;
         const dy   = artifact.y - m.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const minDist = nodeRadius(m) + ARTIFACT_RADIUS;
+        const minDist = nodeRadius(m) + ARTIFACT_COLLISION_RADIUS;
         if (dist < minDist) {
           const push = (minDist - dist) / dist;
           artifact.vx += dx * push * 0.6;
@@ -746,7 +748,7 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
   sim2 = d3.forceSimulation(visibleArtifacts)
     .force('attract',     customAttractionForce(manifestationNodes))
     .force('mCollide',    manifestationCircleCollisionForce(manifestationNodes))
-    .force('collide',     d3.forceCollide(ARTIFACT_RADIUS).strength(0.75))
+    .force('collide',     d3.forceCollide(ARTIFACT_COLLISION_RADIUS).strength(0.75))
     .force('charge',      d3.forceManyBody().strength(-2))
     .force('boundary',  boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.003)
