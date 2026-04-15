@@ -362,11 +362,18 @@ function normalizeManifestations(data, ploKey) {
 
   return raw.map(m => {
     const classes = (m.classes || []).map(c => CLASS_NAME_MAP[c] || c);
+    // similar is an object { id: score } — extract only non-zero pairs within the same PLO
+    const similarRaw = m.similar || {};
+    const similar = Array.isArray(similarRaw)
+      ? similarRaw.map(id => ({ id, score: 2 }))   // legacy array format
+      : Object.entries(similarRaw)
+          .filter(([, v]) => v > 0)
+          .map(([id, score]) => ({ id, score }));
     return {
       id:          m.id,
       title:       m.manifestation || m.title || m.id,
       shortLabel:  m.short_label   || m.manifestation || m.title || m.id,
-      similar:     m.similar       || [],
+      similar,
       plos:        m.plos || plos,
       classes,
       scoreColumn: ploKey ? `${ploKey}_${m.id}` : null,
@@ -414,7 +421,7 @@ function computeManifestationSizes() {
    ═══════════════════════════════════════════════════════════ */
 const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
-const ARTIFACT_COLLISION_RADIUS = 12;
+const ARTIFACT_COLLISION_RADIUS = 7;
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -651,15 +658,16 @@ function buildProgramSimulation(visibleClasses) {
     })
   );
 
+  // Similar-manifestation links — scored, so strength and distance vary by score
   const seenPairs = new Set();
   manifestationNodes.forEach(m => {
-    (m.similar || []).forEach(similarId => {
+    (m.similar || []).forEach(({ id: similarId, score }) => {
       const target = nodeById.get(similarId);
       if (!target) return;
       const key = [m.id, similarId].sort().join('--');
       if (seenPairs.has(key)) return;
       seenPairs.add(key);
-      links.push({ source: m, target, linkType: 'similar' });
+      links.push({ source: m, target, linkType: 'similar', score: score || 2 });
     });
   });
 
@@ -694,21 +702,26 @@ function buildProgramSimulation(visibleClasses) {
   if (sim1) sim1.stop();
 
   const manifestDist = 160;
+  // Score-based distances from manifestations_graph — higher score = pulled closer
+  const similarScoreDist = { 2: 200, 3: 140, 4: 85, 5: 48 };
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
       .id(d => d.id)
-      .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
+      .distance(d => {
+        if (d.linkType === 'similar') return similarScoreDist[d.score] || 200;
+        return d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist;
+      })
       .strength(d => {
-        if (d.linkType === 'similar') return 1.5;
+        if (d.linkType === 'similar') return (d.score || 2) * 0.025;
         return d.target.classes?.length >= 2 ? 1.0 : 0.4;
       }))
     .force('charge', d3.forceManyBody()
-      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -60 : 0))
-    .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
-      .strength(d => d.type === 'class' ? 0.06 : 0))
-    .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : 0)
-      .strength(d => d.type === 'class' ? 0.06 : 0))
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -260 : 0))
+    .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : SIM_W * 0.30)
+      .strength(d => d.type === 'class' ? 0.06 : 0.015))
+    .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : SIM_H * 0.50)
+      .strength(d => d.type === 'class' ? 0.06 : 0.015))
     .force('collide', d3.forceCollide()
       .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
       .strength(0.8))
@@ -847,11 +860,21 @@ function renderAll() {
     .join(
       enter => enter.append('line')
         .attr('class', 'prog-link')
-        .attr('stroke', d => d.linkType === 'similar'
-          ? 'rgba(26,25,22,0.07)'
-          : 'rgba(26,25,22,0.14)')
-        .attr('stroke-opacity', 1)
-        .attr('stroke-width', d => d.linkType === 'similar' ? 0.5 : 0.75),
+        .attr('stroke', d => {
+          if (d.linkType !== 'similar') return 'rgba(26,25,22,0.14)';
+          // Score 2→5: light gray → darker, matching manifestations_graph aesthetic
+          const t = ((d.score || 2) - 2) / 3;
+          const v = Math.round(210 + (40 - 210) * t);
+          return `rgb(${v},${v},${v})`;
+        })
+        .attr('stroke-opacity', d => {
+          if (d.linkType !== 'similar') return 1;
+          return 0.30 + ((d.score || 2) - 2) * 0.18;
+        })
+        .attr('stroke-width', d => {
+          if (d.linkType !== 'similar') return 0.75;
+          return 0.4 + ((d.score || 2) - 2) * 0.4;
+        }),
       update => update,
       exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
     );
@@ -948,13 +971,13 @@ function renderArtifactNodes() {
         .attr('cx', d => d.x || SIM_W * 0.65)
         .attr('cy', d => d.y || SIM_H * 0.5)
         .on('mouseover', showArtifactTooltip)
-        .on('mouseleave', (event, d) => {
-          d3.select(event.currentTarget)
+        .on('mouseleave', () => {
+          // Restore ALL artifact opacities — fixes the dimming-stuck bug
+          d3.selectAll('circle.artifact')
             .attr('r', ARTIFACT_RADIUS)
-            .attr('fill', INK)
             .attr('stroke', 'none')
             .attr('fill-opacity', state.activeManifestationId
-              ? (d.targetManifestationId === state.activeManifestationId ? 1 : 0.15)
+              ? (n => n.targetManifestationId === state.activeManifestationId ? 1 : 0.15)
               : 1);
           hideTooltip();
         }),
