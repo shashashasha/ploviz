@@ -412,7 +412,7 @@ function normalizeRow(r) {
   return out;
 }
 
-// For count.html: each row × manifestation is exploded into floor(score/10) nodes,
+// For count.html: each row × manifestation is exploded into score nodes,
 // each exclusively attracted to its one assigned manifestation.
 function processData(rows, merge = false) {
   const expanded = [];
@@ -421,7 +421,7 @@ function processData(rows, merge = false) {
     PROGRAM_DATA.manifestations.forEach(m => {
       if (!m.scoreColumn) return;
       const score = +(base[m.scoreColumn]) || 0;
-      const nodeCount = Math.floor(score / 10);
+      const nodeCount = score;
       for (let i = 0; i < nodeCount; i++) {
         expanded.push({
           ...base,
