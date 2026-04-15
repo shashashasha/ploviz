@@ -350,6 +350,8 @@ function normalizeManifestations(data, ploKey) {
     return {
       id:          m.id,
       title:       m.manifestation || m.title || m.id,
+      shortLabel:  m.short_label   || m.manifestation || m.title || m.id,
+      similar:     m.similar       || [],
       plos:        m.plos || plos,
       classes,
       scoreColumn: ploKey ? `${ploKey}_${m.id}` : null
@@ -665,7 +667,7 @@ function buildProgramSimulation(visibleClasses) {
     // No hard pin — forceX/forceY home forces keep them near the circle
   });
 
-  // Links: class → manifestation only
+  // Links: class → manifestation
   const links = [];
   manifestationNodes.forEach(m =>
     m.classes.forEach(cid => {
@@ -673,6 +675,19 @@ function buildProgramSimulation(visibleClasses) {
       if (src) links.push({ source: src, target: m, linkType: 'manifestation' });
     })
   );
+
+  // Similar-manifestation links (purely visual, zero force strength)
+  const seenPairs = new Set();
+  manifestationNodes.forEach(m => {
+    (m.similar || []).forEach(similarId => {
+      const target = nodeById.get(similarId);
+      if (!target) return;
+      const key = [m.id, similarId].sort().join('--');
+      if (seenPairs.has(key)) return;
+      seenPairs.add(key);
+      links.push({ source: m, target, linkType: 'similar' });
+    });
+  });
 
   // Helper: spawn position = centroid of a manifestation's linked classes + jitter
   function centroidSpawn(classIds) {
@@ -713,7 +728,10 @@ function buildProgramSimulation(visibleClasses) {
     .force('link', d3.forceLink(links)
       .id(d => d.id)
       .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
-      .strength(d => d.target.classes?.length >= 2 ? 1.0 : 0.4))
+      .strength(d => {
+        if (d.linkType === 'similar') return 0;
+        return d.target.classes?.length >= 2 ? 1.0 : 0.4;
+      }))
     .force('charge', d3.forceManyBody()
       .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -50 : 0))
     // Soft home force — keeps class nodes near their circle positions
@@ -840,8 +858,8 @@ function wordsToLines(words, maxChars) {
 // Estimates the collision radius for a manifestation node based on its text label size.
 // Uses ~8.4px/char (14px Poppins) and 17px line height to approximate the bounding box.
 function manifestationCollideRadius(d) {
-  const words = (d.title || '').split(' ');
-  const lines = wordsToLines(words, 30);
+  const words = (d.shortLabel || d.title || '').split(' ');
+  const lines = wordsToLines(words, 25);
   const maxLen = Math.max(...lines.map(l => l.length));
   const halfW = maxLen * 8.4 / 2 + 12;
   const halfH = lines.length * 17 / 2 + 8;
@@ -874,9 +892,10 @@ function renderAll() {
     .join(
       enter => enter.append('line')
         .attr('class', 'prog-link')
-        .attr('stroke', 'rgba(255,255,255,0.18)')
+        .attr('stroke', d => d.linkType === 'similar' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.18)')
         .attr('stroke-opacity', 1)
-        .attr('stroke-width', d => d.linkType === 'class' ? 1.5 : 1),
+        .attr('stroke-width', d => d.linkType === 'similar' ? 0.5 : 1)
+        .attr('stroke-dasharray', d => d.linkType === 'similar' ? '3,5' : null),
       update => update,
       exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
     );
@@ -928,7 +947,7 @@ function renderAll() {
           .attr('stroke-width', '3px')
           .attr('stroke-linejoin', 'round')
           .each(function(d) {
-            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 14);
+            wrapTextLabel(this, wordsToLines(d.shortLabel.split(' '), 25), 14);
           });
 
         g.on('mouseover', showProgramTooltip)
@@ -1302,7 +1321,7 @@ async function init() {
   try {
     const [csvRes, mRes] = await Promise.all([
       fetch('./data/theses_counted.csv').catch(() => null),
-      fetch('./data/manifestations.json').catch(() => null)
+      fetch('./data/manifestations_similar.json').catch(() => null)
     ]);
     if (csvRes?.ok) csvText = await csvRes.text();
     if (mRes?.ok) {
