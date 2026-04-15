@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Program Learning Outcomes — Count Visualization</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Design Tokens ─────────────────────────────────── */
+    :root {
+      --bg:         #faf9f5;
+      --surface:    #ffffff;
+      --surface2:   #f2f0e8;
+      --border:     #e2dfd4;
+      --text:       #141413;
+      --text-muted: #9c9a90;
+      --accent:     #d97757;
+      --radius:     8px;
+      --sidebar-w:  210px;
+      --header-h:   48px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    .app-header {
+      height: var(--header-h);
+      background: var(--text);
+      color: var(--bg);
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      flex-shrink: 0;
+      gap: 0.75rem;
+    }
+    .app-header h1 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      flex: 1;
+    }
+    .header-badge {
+      font-size: 0.65rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+
+    /* ─── Body Layout ────────────────────────────────────── */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar-section {
+      padding: 0.9rem 0.9rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+    .sidebar-section h3 {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.55rem;
+    }
+    .filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 3px 4px;
+      border-radius: 4px;
+      transition: background 0.1s;
+      user-select: none;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item input[type="checkbox"] {
+      width: 13px; height: 13px;
+      accent-color: var(--text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .swatch {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .filter-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ─── Load CSV button ─────────────────────────────────── */
+    .btn-load {
+      display: block;
+      text-align: center;
+      background: var(--text);
+      color: var(--bg);
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.72rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    .btn-load:hover { opacity: 0.82; }
+    .btn-load-wrap { padding: 0.75rem 0.9rem; }
+
+    /* ─── Canvas ─────────────────────────────────────────── */
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+    #main-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ─── Program Graph Node Labels ──────────────────────── */
+    .prog-label {
+      font-family: 'Poppins', sans-serif;
+      pointer-events: none;
+      dominant-baseline: middle;
+      text-anchor: middle;
+    }
+    .prog-label--class { text-transform: uppercase; }
+
+    /* ─── Artifact circles ────────────────────────────────── */
+    .artifact {
+      cursor: pointer;
+      transition: r 0.1s;
+    }
+
+    /* ─── Tooltip ─────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.8rem 0.95rem;
+      max-width: 290px;
+      min-width: 200px;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06);
+      z-index: 200;
+      display: none;
+    }
+    #tooltip.visible { display: block; }
+
+    .tt-title   { font-weight: 600; font-size: 0.78rem; margin-bottom: 2px; }
+    .tt-meta    { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 6px; }
+    .tt-divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+    .tt-excerpt {
+      font-size: 0.71rem;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tt-scores-label {
+      font-size: 0.63rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .score-row  { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .score-name { flex: 0 0 120px; font-size: 0.67rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .score-fill  { height: 100%; border-radius: 3px; }
+    .score-val  { font-size: 0.67rem; font-weight: 600; min-width: 22px; text-align: right; }
+
+
+    /* ─── PLO selector ───────────────────────────────────── */
+    .plo-select {
+      width: 100%;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.72rem;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      margin-bottom: 0.5rem;
+    }
+    .plo-description {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    /* ─── Scrollbar styling ──────────────────────────────── */
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Program Learning Outcomes — Count Visualization</h1>
+  <span class="header-badge" id="artifact-count">0 artifacts</span>
+</header>
+
+<div class="app-body">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h3>Program Learning Outcome</h3>
+      <select id="plo-select" class="plo-select">
+        <option value="PLO1">PLO 1 — Socio-ecologically sustainable</option>
+        <option value="PLO2">PLO 2 — Situated knowledge</option>
+      </select>
+      <p id="plo-description" class="plo-description"></p>
+    </div>
+    <div class="sidebar-section">
+      <h3>Authors</h3>
+      <div class="filter-list" id="author-filters"></div>
+    </div>
+    <div class="btn-load-wrap">
+      <label class="btn-load" for="csv-input">+ Load CSV</label>
+      <input type="file" id="csv-input" accept=".csv" style="display:none" />
+    </div>
+  </aside>
+
+  <main class="canvas-wrap" id="canvas-wrap">
+    <svg id="main-svg"></svg>
+    <div id="tooltip"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PROGRAM STRUCTURE — edit this object to match your program
+   ═══════════════════════════════════════════════════════════ */
+const PROGRAM_DATA = {
+  // Classes ordered so related pairs are adjacent on the circle layout —
+  // this places cross-class manifestation nodes naturally between their parents.
+  classes: [
+    { id: 'des720a', title: 'DES 720A — Graduate Studio Technology A',              plos: ['plo1'] },
+    { id: 'des720b', title: 'DES 720B — Graduate Studio Technology B',              plos: ['plo1'] },
+    { id: 'des710a', title: 'DES 710A — Graduate Studio Visual Language A',         plos: ['plo1'] },
+    { id: 'des710b', title: 'DES 710B — Graduate Studio Visual Language B',         plos: ['plo1'] },
+    { id: 'des751',  title: 'DES 751 — Design Writing',                             plos: ['plo1'] },
+    { id: 'des730',  title: 'DES 730A/B — Transformation Design',                   plos: ['plo1'] },
+    { id: 'des741',  title: 'DES 741 — Cross-disciplinary Studio: Symbiotic Futures', plos: ['plo1'] },
+    { id: 'des796',  title: 'DES 796 — Thesis I',                                   plos: ['plo1'] },
+    { id: 'des797',  title: 'DES 797 — Thesis II',                                  plos: ['plo1'] }
+  ],
+
+  // Populated at runtime from data/manifestations.json
+  manifestations: [],
+
+  // Full PLO keyed object from manifestations.json — populated at runtime
+  ploData: {}
+};
+
+/* ═══════════════════════════════════════════════════════════
+   NORMALIZE MANIFESTATIONS — converts old and new JSON formats
+   into the internal representation used by the graph.
+   New keyed format: { PLO1: { plo, title, manifestations: [] }, PLO2: … }
+   Legacy object format: { manifestations: [{id, manifestation, classes}] }
+   Legacy array format:  [{id, title, plos, classes}]
+   Pass ploKey (e.g. 'PLO1') to extract a specific PLO's manifestations.
+   ═══════════════════════════════════════════════════════════ */
+function normalizeManifestations(data, ploKey) {
+  // New keyed format: { PLO1: { manifestations: [] }, … }
+  let raw;
+  let plos;
+  if (ploKey && data[ploKey]) {
+    raw  = data[ploKey].manifestations || [];
+    plos = [ploKey.toLowerCase()];   // 'PLO1' → 'plo1', 'PLO2' → 'plo2'
+  } else {
+    raw  = Array.isArray(data) ? data : (data.manifestations || []);
+    plos = ['plo1'];
+  }
+
+  // Human-readable class names → internal IDs used in PROGRAM_DATA
+  const CLASS_NAME_MAP = {
+    'DES 720A': 'des720a', 'DES 720B': 'des720b',
+    'DES 710A': 'des710a', 'DES 710B': 'des710b',
+    'DES 751':  'des751',  'DES 730A/B': 'des730',
+    'DES 741':  'des741',  'DES 796':  'des796',
+    'DES 797':  'des797'
+  };
+
+  return raw.map(m => {
+    const classes = (m.classes || []).map(c => CLASS_NAME_MAP[c] || c);
+    return {
+      id:          m.id,
+      title:       m.manifestation || m.title || m.id,
+      plos:        m.plos || plos,
+      classes,
+      scoreColumn: ploKey ? `${ploKey}_${m.id}` : null
+    };
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COLOR SYSTEM
+   ═══════════════════════════════════════════════════════════ */
+const PLO_COLORS = {
+  plo1: '#00da08',
+  plo2: '#4872a4',   // blue   — Material
+  plo3: '#b05c3a',   // terracotta — Equity
+  plo4: '#7659a0'    // purple — Systems
+};
+
+function ploColor(ploId) { return PLO_COLORS[ploId] || '#888'; }
+
+function nodeColor(d) {
+  const primaryPlo = (d.plos && d.plos[0]) || 'plo1';
+  return PLO_COLORS[primaryPlo] || '#888';
+}
+
+// Artifact color matches PLO color directly
+const CLASS_COLORS = {};
+function initClassColors(ploKey = 'PLO1') {
+  const ploInternal = ploKey === 'PLO2' ? 'plo2' : 'plo1';
+  PROGRAM_DATA.classes.forEach(c => {
+    CLASS_COLORS[c.id] = PLO_COLORS[ploInternal] || '#888';
+  });
+}
+
+function classColor(classId) { return CLASS_COLORS[classId] || '#888'; }
+
+function artifactFill(d) {
+  const m = PROGRAM_DATA.manifestations.find(m => m.id === d.targetManifestationId);
+  if (!m) return '#b8b8b8';
+  return ploColor(m.plos[0]);
+}
+
+function nodeRadius(d) {
+  if (d.type === 'class')         return 18;
+  if (d.type === 'manifestation') return 13;
+  return 7;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+const state = {
+  visibleClasses:        new Set(PROGRAM_DATA.classes.map(c => c.id)),
+  visibleAuthors:        new Set(),
+  allArtifacts:          [],
+  activeManifestationId: null,  // ID of currently pinned manifestation, or null
+  activePlo:             'PLO1'
+};
+
+// D3 globals
+let svg, svgWidth, svgHeight, zoom;
+// Simulation world size — much larger than the viewport so nodes can spread freely.
+// The zoom/pan layer is the window into this space.
+const SIM_W = 4000;
+const SIM_H = 4000;
+let sim1, sim2;
+let progLinkSel, progNodeSel, artNodeSel;
+let _programNodes = [], _programLinks = [], _manifestationNodes = [];
+let _artifactNodes = [];
+
+/* ═══════════════════════════════════════════════════════════
+   DATA PROCESSING
+   ═══════════════════════════════════════════════════════════ */
+const REQUIRED_COLS = ['author','thesis_title','paragraph'];
+
+function normalizeRow(r) {
+  const out = { ...r };
+  if (!out.class) out.class = 'des797';
+  return out;
+}
+
+// For count.html: each row × manifestation is exploded into floor(score/10) nodes,
+// each exclusively attracted to its one assigned manifestation.
+function processData(rows, merge = false) {
+  const expanded = [];
+  rows.forEach(r => {
+    const base = normalizeRow(r);
+    PROGRAM_DATA.manifestations.forEach(m => {
+      if (!m.scoreColumn) return;
+      const score = +(base[m.scoreColumn]) || 0;
+      const nodeCount = Math.floor(score / 10);
+      for (let i = 0; i < nodeCount; i++) {
+        expanded.push({
+          ...base,
+          _instanceIdx: i,
+          targetManifestationId: m.id,
+          targetScoreColumn: m.scoreColumn,
+          score
+        });
+      }
+    });
+  });
+
+  // Assign UIDs after full expansion
+  const offset = merge ? state.allArtifacts.length : 0;
+  expanded.forEach((a, i) => { a._uid = offset + i; });
+
+  if (merge) {
+    // Deduplicate by author + paragraph prefix + manifestation + instance
+    const existing = new Set(
+      state.allArtifacts.map(a =>
+        `${a.author}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a._instanceIdx}`
+      )
+    );
+    const fresh = expanded.filter(a =>
+      !existing.has(`${a.author}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a._instanceIdx}`)
+    );
+    state.allArtifacts = [...state.allArtifacts, ...fresh];
+    fresh.forEach(a => state.visibleAuthors.add(a.author));
+    fresh.forEach(a => { if (a.class) state.visibleClasses.add(a.class); });
+  } else {
+    state.allArtifacts = expanded;
+    const authors = [...new Set(expanded.map(a => a.author))];
+    authors.forEach(a => state.visibleAuthors.add(a));
+  }
+}
+
+function getVisibleArtifacts() {
+  return state.allArtifacts.filter(a =>
+    state.visibleClasses.has(a.class) &&
+    state.visibleAuthors.has(a.author)
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SVG FILTERS
+   ═══════════════════════════════════════════════════════════ */
+function addSvgFilters() {
+  const defs = svg.append('defs');
+  const f = defs.append('filter').attr('id', 'node-shadow')
+    .attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  f.append('feDropShadow')
+    .attr('dx', 0).attr('dy', 1)
+    .attr('stdDeviation', 3)
+    .attr('flood-color', 'rgba(0,0,0,0.18)');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SVG SETUP
+   ═══════════════════════════════════════════════════════════ */
+function setupSVG() {
+  const wrap = document.getElementById('canvas-wrap');
+  svgWidth  = wrap.clientWidth;
+  svgHeight = wrap.clientHeight;
+
+  svg = d3.select('#main-svg')
+    .attr('width', svgWidth)
+    .attr('height', svgHeight);
+
+  // Zoom layer wraps all graph content (not the legend)
+  const zoomLayer = svg.append('g').attr('id', 'zoom-layer');
+  zoomLayer.append('g').attr('id', 'layer-prog-links');
+  zoomLayer.append('g').attr('id', 'layer-art-nodes');   // artifacts UNDER program nodes
+  zoomLayer.append('g').attr('id', 'layer-prog-nodes');  // program nodes always on top
+
+  // Zoom + pan behavior
+  zoom = d3.zoom()
+    .scaleExtent([0.2, 8])
+    .on('zoom', (event) => {
+      const { x, y, k } = event.transform;
+      zoomLayer.attr('transform', `translate(${x},${y}) scale(${k})`);
+      // Counter-scale text so labels stay the same screen size
+      svg.selectAll('.prog-label').attr('font-size', function() {
+        const base = parseFloat(d3.select(this).attr('data-base-size') || this.getAttribute('font-size') || 7);
+        d3.select(this).attr('data-base-size', base);
+        return `${base / k}px`;
+      });
+      // Also counter-scale label dy (distance below node stays consistent)
+      svg.selectAll('.prog-label').attr('dy', function() {
+        const base = parseFloat(d3.select(this).attr('data-base-dy') || this.getAttribute('dy') || 0);
+        d3.select(this).attr('data-base-dy', base);
+        return base / k;
+      });
+    });
+
+  svg.call(zoom);
+
+  // Double-click to reset zoom
+  svg.on('dblclick.zoom', null); // disable d3's default dblclick zoom
+  svg.on('dblclick', () => svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity));
+
+  // Click/tap on empty canvas clears any active manifestation highlight
+  svg.on('click.clearHighlight touchend.clearHighlight', (event) => {
+    if (event.target === svg.node() || event.target === zoomLayer.node()) {
+      clearManifestationHighlight();
+    }
+  });
+
+  // Resize observer — re-pin class nodes to new circle positions on resize
+  new ResizeObserver(() => {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
+    svgWidth = w; svgHeight = h;
+    svg.attr('width', svgWidth).attr('height', svgHeight);
+    if (sim1) sim1.alpha(0.2).restart();
+  }).observe(wrap);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM FORCES
+   ═══════════════════════════════════════════════════════════ */
+// Soft boundary repulsion — keeps nodes from going off-screen
+// Uses initialize() so nodes are captured properly (no `this` dependency)
+function boundaryForce(getWidth, getHeight, padding) {
+  let _nodes = [];
+  function force(alpha) {
+    const W = getWidth(), H = getHeight();
+    const strength = 0.18 * alpha;
+    _nodes.forEach(n => {
+      const r = (n.type ? nodeRadius(n) : 8) + padding;
+      if (n.x < r)       n.vx += (r - n.x) * strength;
+      if (n.x > W - r)   n.vx -= (n.x - (W - r)) * strength;
+      if (n.y < r)       n.vy += (r - n.y) * strength;
+      if (n.y > H - r)   n.vy -= (n.y - (H - r)) * strength;
+    });
+  }
+  force.initialize = function(nodes) { _nodes = nodes; };
+  return force;
+}
+
+// count.html: each artifact node has a single target manifestation it orbits.
+function customAttractionForce(manifestationNodes) {
+  const mMap = new Map(manifestationNodes.map(m => [m.id, m]));
+  let _nodes = [];
+  function force(alpha) {
+    const ATTRACT_K = 0.4 * Math.min(1, (SIM_W * SIM_H) / (900 * 600));
+    _nodes.forEach(artifact => {
+      const mNode = mMap.get(artifact.targetManifestationId);
+      if (!mNode || mNode.x == null || mNode.y == null) return;
+
+      const dx   = mNode.x - artifact.x;
+      const dy   = mNode.y - artifact.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+      // Orbit at a small fixed radius around the manifestation node
+      const targetDist = 20;
+      const tension = (dist - targetDist) / dist;
+
+      const s = tension * ATTRACT_K * alpha;
+      artifact.vx += dx * s;
+      artifact.vy += dy * s;
+    });
+  }
+  force.initialize = function(nodes) {
+    _nodes = nodes.filter(n => n.targetManifestationId);
+  };
+  return force;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CLASS CIRCLE POSITIONS — computed from current viewport
+   ═══════════════════════════════════════════════════════════ */
+function classCirclePos(classId) {
+  const classes = PROGRAM_DATA.classes;
+  const idx = classes.findIndex(c => c.id === classId);
+  if (idx < 0) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
+  const cx = SIM_W * 0.30;
+  const cy = SIM_H * 0.50;
+  const rx = SIM_W * 0.11;
+  const ry = SIM_H * 0.19;
+  const angle = (idx / classes.length) * 2 * Math.PI - Math.PI / 2;
+  return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 1 — Program Graph
+   Classes are PINNED in a circle (fx/fy).
+   Manifestations float around them via force.
+   ═══════════════════════════════════════════════════════════ */
+function buildProgramSimulation(visibleClasses) {
+  const classNodes = PROGRAM_DATA.classes
+    .filter(c => visibleClasses.has(c.id))
+    .map(c => ({ ...c, type: 'class' }));
+  const manifestationNodes = PROGRAM_DATA.manifestations
+    .filter(m => m.classes.some(cid => visibleClasses.has(cid)))
+    .map(m => ({ ...m, type: 'manifestation' }));
+
+  const nodes = [...classNodes, ...manifestationNodes];
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+  // ── Set initial class positions (soft-pinned via home force) ─
+  classNodes.forEach(n => {
+    const pos = classCirclePos(n.id);
+    n.x  = pos.x;  n.y  = pos.y;
+    // No hard pin — forceX/forceY home forces keep them near the circle
+  });
+
+  // Links: class → manifestation only
+  const links = [];
+  manifestationNodes.forEach(m =>
+    m.classes.forEach(cid => {
+      const src = nodeById.get(cid);
+      if (src) links.push({ source: src, target: m, linkType: 'manifestation' });
+    })
+  );
+
+  // Helper: spawn position = centroid of a manifestation's linked classes + jitter
+  function centroidSpawn(classIds) {
+    const positions = (classIds || []).map(cid => classCirclePos(cid));
+    if (!positions.length) return { x: SIM_W * 0.30, y: SIM_H * 0.5 };
+    const ax = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const ay = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    return {
+      x: ax + (Math.random() - 0.5) * 28,
+      y: ay + (Math.random() - 0.5) * 28
+    };
+  }
+
+  // Preserve positions for manifestation nodes that already existed
+  if (sim1) {
+    const oldById = new Map(sim1.nodes().filter(n => n.type !== 'class').map(n => [n.id, n]));
+    manifestationNodes.forEach(n => {
+      const old = oldById.get(n.id);
+      if (old) { n.x = old.x; n.y = old.y; n.vx = old.vx || 0; n.vy = old.vy || 0; }
+      else {
+        const sp = centroidSpawn(n.classes);
+        n.x = sp.x; n.y = sp.y;
+      }
+    });
+  } else {
+    // First build — spawn each manifestation near its linked classes
+    manifestationNodes.forEach(n => {
+      const sp = centroidSpawn(n.classes);
+      n.x = sp.x; n.y = sp.y;
+    });
+  }
+
+  if (sim1) sim1.stop();
+
+  const manifestDist = 150;
+
+  sim1 = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links)
+      .id(d => d.id)
+      .distance(d => d.target.classes?.length >= 2 ? manifestDist * 0.65 : manifestDist)
+      .strength(d => d.target.classes?.length >= 2 ? 1.0 : 0.4))
+    .force('charge', d3.forceManyBody()
+      .strength(d => d.type === 'class' ? -350 : d.type === 'manifestation' ? -200 : 0))
+    // Soft home force — keeps class nodes near their circle positions
+    .force('classHomeX', d3.forceX(d => d.type === 'class' ? classCirclePos(d.id).x : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
+    .force('classHomeY', d3.forceY(d => d.type === 'class' ? classCirclePos(d.id).y : 0)
+      .strength(d => d.type === 'class' ? 0.06 : 0))
+    .force('collide', d3.forceCollide()
+      .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
+      .strength(0.8))
+    .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
+    .alphaDecay(0.005)
+    .velocityDecay(0.45)
+    .stop()   // prevent auto-start; caller is responsible for starting
+    .on('tick', onTick);
+
+  return { nodes, links, manifestationNodes };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION 2 — Artifacts
+   ═══════════════════════════════════════════════════════════ */
+// count.html: each artifact has a single assigned manifestation
+function topManifestationFor(artifact, manifestationNodes) {
+  return manifestationNodes.find(m => m.id === artifact.targetManifestationId) || null;
+}
+
+function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
+  const oldById = sim2
+    ? new Map(sim2.nodes().map(n => [n._uid, { x: n.x, y: n.y, vx: n.vx, vy: n.vy }]))
+    : new Map();
+
+  visibleArtifacts.forEach(a => {
+    const old = oldById.get(a._uid);
+    if (old) {
+      a.x = old.x; a.y = old.y; a.vx = old.vx; a.vy = old.vy;
+    } else {
+      const top = topManifestationFor(a, manifestationNodes);
+      // Use manifestation's current position if available; otherwise scatter in right half
+      const bx = (top?.x != null && top.x > 10) ? top.x : SIM_W * 0.6 + Math.random() * SIM_W * 0.3;
+      const by = (top?.y != null) ? top.y : SIM_H * 0.2 + Math.random() * SIM_H * 0.6;
+      a.x = bx + (Math.random() - 0.5) * 60;
+      a.y = by + (Math.random() - 0.5) * 60;
+    }
+  });
+
+  if (sim2) sim2.stop();
+
+  sim2 = d3.forceSimulation(visibleArtifacts)
+    .force('attract',   customAttractionForce(manifestationNodes))
+    .force('collide',   d3.forceCollide(5).strength(0.75))
+    .force('charge',    d3.forceManyBody().strength(-2))
+    .force('boundary',  boundaryForce(() => SIM_W, () => SIM_H, 10))
+    .alphaDecay(0.003)
+    .velocityDecay(0.4)
+    .stop()   // prevent auto-start; caller starts it
+    .on('tick', onTick);
+
+  return sim2;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TICK HANDLER
+   ═══════════════════════════════════════════════════════════ */
+function onTick() {
+  if (progLinkSel) {
+    progLinkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  }
+  if (progNodeSel) {
+    progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+  if (artNodeSel) {
+    artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DRAG
+   ═══════════════════════════════════════════════════════════ */
+function makeDrag(simulation) {
+  return d3.drag()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.2).restart();
+      if (sim2) sim2.alphaTarget(0.3).restart();
+      d.fx = d.x; d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x; d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      if (sim2) sim2.alphaTarget(0);
+      // PLO nodes: re-pin at new dragged position; others: release
+      if (d.type !== 'plo') {
+        d.fx = null; d.fy = null;
+      }
+      // (PLO keeps d.fx = event.x from drag move — stays pinned where dropped)
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ═══════════════════════════════════════════════════════════ */
+// Splits an array of words into lines where each line stays under maxChars.
+function wordsToLines(words, maxChars) {
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? current + ' ' + word : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+// Estimates the collision radius for a manifestation node based on its text label size.
+// Uses ~8.4px/char (14px Poppins) and 17px line height to approximate the bounding box.
+function manifestationCollideRadius(d) {
+  const words = (d.title || '').split(' ');
+  const lines = wordsToLines(words, 30);
+  const maxLen = Math.max(...lines.map(l => l.length));
+  const halfW = maxLen * 8.4 / 2 + 12;
+  const halfH = lines.length * 17 / 2 + 8;
+  return Math.max(halfW, halfH);
+}
+
+// Appends <tspan> children to a single SVG <text> DOM node.
+// lines: string[] — one entry per visual line.
+// lineH: vertical spacing in px between lines.
+// The block is centered vertically around the text element's position.
+function wrapTextLabel(textNode, lines, lineH) {
+  const offsetY = -((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => {
+    const ts = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    ts.setAttribute('x', 0);
+    ts.setAttribute('dy', i === 0 ? offsetY : lineH);
+    ts.textContent = line;
+    textNode.appendChild(ts);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderAll() {
+  // ── Program Links ──────────────────────────────────────────
+  progLinkSel = svg.select('#layer-prog-links')
+    .selectAll('line.prog-link')
+    .data(_programLinks, d => `${d.source.id}--${d.target.id}`)
+    .join(
+      enter => enter.append('line')
+        .attr('class', 'prog-link')
+        .attr('stroke', 'rgba(255,255,255,0.18)')
+        .attr('stroke-opacity', 1)
+        .attr('stroke-width', d => d.linkType === 'class' ? 1.5 : 1),
+      update => update,
+      exit   => exit.transition().duration(250).attr('stroke-opacity', 0).remove()
+    );
+
+  // ── Program Nodes ──────────────────────────────────────────
+  progNodeSel = svg.select('#layer-prog-nodes')
+    .selectAll('g.prog-node')
+    .data(_programNodes, d => d.id)
+    .join(
+      enter => {
+        const g = enter.append('g')
+          .attr('class', 'prog-node')
+          .style('cursor', 'grab')
+          .call(makeDrag(sim1));
+
+        g.append('circle')
+          .attr('class', 'node-circle')
+          .attr('r', d => nodeRadius(d))
+          .attr('fill', d => nodeColor(d))
+          .attr('fill-opacity', 0.2)
+          .attr('stroke', d => d.type === 'manifestation' ? '#000' : '#fff')
+          .attr('stroke-width', 2)
+          .attr('filter', 'url(#node-shadow)');
+
+        // Class label — class code on first line, name on second
+        g.filter(d => d.type === 'class')
+          .append('text')
+          .attr('class', 'prog-label prog-label--class')
+          .attr('font-size', '10px')
+          .attr('font-weight', '500')
+          .attr('fill', '#fff')
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(0,0,0,0.85)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .each(function(d) {
+            const sep = d.title.indexOf(' — ');
+            const code = sep >= 0 ? d.title.slice(0, sep) : d.title;
+            const name = sep >= 0 ? d.title.slice(sep + 3) : '';
+            wrapTextLabel(this, name ? [code, name] : [code], 11);
+          });
+
+        // Manifestation label — single <text> per node, word-wrapped via wrapTextLabel
+        g.filter(d => d.type === 'manifestation')
+          .append('text')
+          .attr('class', 'prog-label')
+          .attr('font-size', '11px')
+          .attr('fill', '#fff')
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'rgba(0,0,0,0.85)')
+          .attr('stroke-width', '3px')
+          .attr('stroke-linejoin', 'round')
+          .each(function(d) {
+            wrapTextLabel(this, wordsToLines(d.title.split(' '), 30), 14);
+          });
+
+        g.on('mouseover', showProgramTooltip)
+         .on('mouseleave', hideTooltip);
+
+        // Manifestation tap/click — toggle artifact highlight
+        g.filter(d => d.type === 'manifestation')
+          .style('cursor', 'pointer')
+          .on('click.highlight touchend.highlight', (event, d) => {
+            event.stopPropagation();
+            if (state.activeManifestationId === d.id) {
+              clearManifestationHighlight();
+            } else {
+              highlightArtifactsForManifestation(d.id);
+            }
+          });
+
+        return g;
+      },
+      update => {
+        update.select('circle')
+          .attr('r', d => nodeRadius(d))
+          .attr('fill', d => nodeColor(d));
+        return update;
+      },
+      exit => exit.transition().duration(250).attr('opacity', 0).remove()
+    );
+
+  renderArtifactNodes();
+  updateArtifactCount();
+}
+
+function renderArtifactNodes() {
+  artNodeSel = svg.select('#layer-art-nodes')
+    .selectAll('circle.artifact')
+    .data(_artifactNodes, d => d._uid)
+    .join(
+      enter => enter.append('circle')
+        .attr('class', 'artifact')
+        .attr('r', 3.5)
+        .attr('fill', d => artifactFill(d))
+        .attr('fill-opacity', 0.7)
+        .attr('stroke', 'none')
+        .attr('cx', d => d.x || SIM_W * 0.65)
+        .attr('cy', d => d.y || SIM_H * 0.5)
+        .on('mouseover', showArtifactTooltip)
+        .on('mouseleave', (event, d) => {
+          if (state.activeManifestationId) {
+            // Restore this artifact to the manifestation-highlight state
+            const mId = state.activeManifestationId;
+            const scored = (d[mId] || 0) > 0;
+            d3.select(event.currentTarget)
+              .attr('r',            scored ? 5    : 3.5)
+              .attr('fill-opacity', scored ? 1    : 0.1)
+              .attr('stroke',       scored ? classColor(d.class) : 'none');
+            // Restore prog nodes to manifestation-highlight state (not full default)
+            d3.selectAll('g.prog-node').select('circle')
+              .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
+              .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
+          } else {
+            d3.select(event.currentTarget)
+              .attr('r', 3.5)
+              .attr('fill', artifactFill(d))
+              .attr('stroke', 'none')
+              .attr('fill-opacity', 0.7);
+            restoreProgNodes();
+          }
+          hideTooltip();
+        }),
+      update => update.attr('fill', d => artifactFill(d)),
+      exit   => exit.transition().duration(180)
+        .attr('r', 0)
+        .attr('fill-opacity', 0)
+        .remove()
+    );
+}
+
+
+function updateArtifactCount() {
+  document.getElementById('artifact-count').textContent =
+    `${_artifactNodes.length} instance${_artifactNodes.length !== 1 ? 's' : ''}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION STARTUP
+   Runs a synchronous warm-up so nodes have positions on first
+   paint, then hands off to async requestAnimationFrame ticks.
+   ═══════════════════════════════════════════════════════════ */
+function startSimulations(includeProgram = true) {
+  if (includeProgram) {
+    // Warm-up: run 120 ticks synchronously so positions are set before first paint
+    sim1.alpha(1);
+    for (let i = 0; i < 120; i++) sim1.tick();
+    // Apply positions to DOM immediately
+    if (progLinkSel) {
+      progLinkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    }
+    if (progNodeSel) progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    // Continue async from where warm-up left off
+    sim1.alpha(0.4).restart();
+  }
+
+  // Artifact sim: warm-up then continue async
+  sim2.alpha(1);
+  for (let i = 0; i < 60; i++) sim2.tick();
+  if (artNodeSel) artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  sim2.alpha(0.5).restart();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER ORCHESTRATION
+   ═══════════════════════════════════════════════════════════ */
+function updateFilters(authorOnly = false) {
+  if (!authorOnly) {
+    const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+    _programNodes      = nodes;
+    _programLinks      = links;
+    _manifestationNodes = manifestationNodes;
+  }
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+
+  startSimulations(!authorOnly);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PLO SWITCHER
+   ═══════════════════════════════════════════════════════════ */
+function switchPlo(ploKey) {
+  state.activePlo = ploKey;
+  PROGRAM_DATA.manifestations = normalizeManifestations(PROGRAM_DATA.ploData, ploKey);
+  // Derive visible classes from this PLO's manifestations
+  state.visibleClasses = new Set(
+    PROGRAM_DATA.manifestations.flatMap(m => m.classes)
+  );
+  clearManifestationHighlight();
+  initClassColors(ploKey);
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+  renderAll();
+  startSimulations(true);
+  renderPloInfo();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════════════════ */
+function renderSidebar() {
+  renderPloInfo();
+  renderAuthorFilters();
+}
+
+let _ploSelectListenerAttached = false;
+function renderPloInfo() {
+  const sel = document.getElementById('plo-select');
+  const desc = document.getElementById('plo-description');
+  if (!sel || !desc) return;
+
+  sel.value = state.activePlo;
+  desc.textContent = PROGRAM_DATA.ploData[state.activePlo]?.title || '';
+
+  // Attach listener only once to avoid stacking handlers
+  if (!_ploSelectListenerAttached) {
+    sel.addEventListener('change', e => switchPlo(e.target.value));
+    _ploSelectListenerAttached = true;
+  }
+}
+
+function renderAuthorFilters() {
+  const container = document.getElementById('author-filters');
+  container.innerHTML = '';
+  const authors = [...new Set(state.allArtifacts.map(a => a.author))].sort();
+  const timers = {};
+
+  authors.forEach(author => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.visibleAuthors.has(author);
+    cb.dataset.author = author;
+
+    // Use click on the label with a timer to distinguish single vs double click.
+    // Prevents the native change event from firing mid-double-click.
+    label.addEventListener('click', e => {
+      e.preventDefault(); // stop checkbox from toggling immediately
+
+      if (timers[author]) {
+        // Second click within 250ms — treat as double click
+        clearTimeout(timers[author]);
+        delete timers[author];
+
+        const allAuthors = [...new Set(state.allArtifacts.map(a => a.author))];
+        const onlyThisSelected =
+          state.visibleAuthors.size === 1 && state.visibleAuthors.has(author);
+        if (onlyThisSelected) {
+          allAuthors.forEach(a => state.visibleAuthors.add(a));
+        } else {
+          state.visibleAuthors.clear();
+          state.visibleAuthors.add(author);
+        }
+        renderAuthorFilters();
+        updateFilters(true);
+      } else {
+        // First click — wait to see if a second follows
+        timers[author] = setTimeout(() => {
+          delete timers[author];
+          // Single click: toggle
+          if (state.visibleAuthors.has(author)) state.visibleAuthors.delete(author);
+          else state.visibleAuthors.add(author);
+          cb.checked = state.visibleAuthors.has(author);
+          updateFilters(true);
+        }, 250);
+      }
+    });
+
+    const name = document.createElement('span');
+    name.textContent = author;
+
+    label.append(cb, name);
+    container.appendChild(label);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLTIPS
+   ═══════════════════════════════════════════════════════════ */
+const tooltipEl = document.getElementById('tooltip');
+
+function positionTooltip(event) {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const ttW = 290, ttH = tooltipEl.offsetHeight || 180;
+  const margin = 14;
+  let left = event.clientX - rect.left + margin;
+  let top  = event.clientY - rect.top  + margin;
+  if (left + ttW > rect.width  - 6) left = event.clientX - rect.left - ttW - margin;
+  if (top  + ttH > rect.height - 6) top  = event.clientY - rect.top  - ttH - margin;
+  tooltipEl.style.left = Math.max(0, left) + 'px';
+  tooltipEl.style.top  = Math.max(0, top)  + 'px';
+}
+
+function highlightArtifactsForManifestation(mId) {
+  state.activeManifestationId = mId;
+  d3.selectAll('circle.artifact')
+    .attr('r',            d => (d[mId] || 0) > 0 ? 5    : 3.5)
+    .attr('fill-opacity', d => (d[mId] || 0) > 0 ? 1    : 0.1)
+    .attr('stroke',       d => (d[mId] || 0) > 0 ? classColor(d.class) : 'none')
+    .attr('stroke-width', 1.5);
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === mId ? 1 : 0.1))
+    .attr('stroke-width', nd => nd.id === mId ? 4 : 2);
+}
+
+function clearManifestationHighlight() {
+  state.activeManifestationId = null;
+  d3.selectAll('circle.artifact')
+    .attr('r',            3.5)
+    .attr('fill',         d => artifactFill(d))
+    .attr('fill-opacity', 0.7)
+    .attr('stroke',       'none');
+  restoreProgNodes();
+}
+
+function restoreProgNodes() {
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', 0.2)
+    .attr('stroke-width', 2);
+}
+
+function showArtifactTooltip(event, d) {
+  const mInfo = PROGRAM_DATA.manifestations.find(m => m.id === d.targetManifestationId);
+  const mColor = mInfo ? ploColor(mInfo.plos[0]) : '#888';
+
+  d3.select(event.currentTarget)
+    .attr('r', 5)
+    .attr('stroke', mColor)
+    .attr('stroke-width', 2)
+    .attr('fill-opacity', 1);
+
+  // Highlight just the target manifestation node, dim all others
+  d3.selectAll('g.prog-node').select('circle')
+    .attr('fill-opacity', nd => nd.type === 'class' ? 0.2 : (nd.id === d.targetManifestationId ? 1 : 0.1))
+    .attr('stroke-width', nd => nd.id === d.targetManifestationId ? 4 : 2);
+
+  const excerpt = (d.paragraph || '').trim();
+  const snippetLength = 220;
+  const snippet = excerpt.length > snippetLength ? excerpt.slice(0, snippetLength) + '…' : excerpt;
+
+  tooltipEl.innerHTML = `
+    <div class="tt-title">${d.author}</div>
+    <div class="tt-meta">${d.thesis_title}</div>
+    <hr class="tt-divider">
+    <div class="tt-scores-label" style="color:${mColor}">${mInfo ? mInfo.title : d.targetManifestationId}</div>
+    <hr class="tt-divider">
+    <div class="tt-excerpt">${snippet}</div>`;
+
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function showProgramTooltip(event, d) {
+  const typeLabel = { class: 'Class', manifestation: 'Manifestation' }[d.type] || d.type;
+  tooltipEl.innerHTML = `
+    <div class="tt-title">${d.title}</div>
+    <div class="tt-meta">${typeLabel}</div>`;
+  tooltipEl.classList.add('visible');
+  positionTooltip(event);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILE PICKER
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('csv-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const rows = d3.csvParse(text);
+  if (!rows.length) { alert('CSV appears empty.'); return; }
+
+  const missing = REQUIRED_COLS.filter(c => !(c in rows[0]));
+  if (missing.length) {
+    alert(`CSV is missing required columns:\n${missing.join(', ')}\n\nExpected:\n${REQUIRED_COLS.join(', ')}`);
+    return;
+  }
+
+  processData(rows, true);
+  renderSidebar();
+  updateFilters(false);
+  e.target.value = '';
+});
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+async function init() {
+  initClassColors(state.activePlo);
+
+  let csvText = null;
+  try {
+    const [csvRes, mRes] = await Promise.all([
+      fetch('./data/artifacts.csv').catch(() => null),
+      fetch('./data/manifestations.json').catch(() => null)
+    ]);
+    if (csvRes?.ok) csvText = await csvRes.text();
+    if (mRes?.ok) {
+      const data = await mRes.json();
+      PROGRAM_DATA.ploData = data;
+      PROGRAM_DATA.manifestations = normalizeManifestations(data, state.activePlo);
+    }
+  } catch (_) { /* file:// protocol */ }
+
+  const rows = d3.csvParse(csvText || '');
+  processData(rows, false);
+
+  setupSVG();
+  addSvgFilters();
+  renderSidebar();
+
+  // Build initial program simulation first, then artifacts
+  const { nodes, links, manifestationNodes } = buildProgramSimulation(state.visibleClasses);
+  _programNodes       = nodes;
+  _programLinks       = links;
+  _manifestationNodes = manifestationNodes;
+
+  const visible = getVisibleArtifacts();
+  buildArtifactSimulation(visible, _manifestationNodes);
+  _artifactNodes = visible;
+
+  renderAll();
+  startSimulations();
+
+  // Set initial zoom so the program graph fills the viewport on load.
+  // The program graph is centered around (SIM_W*0.30, SIM_H*0.50) in sim space.
+  // We scale to fit it within the viewport and center it.
+  const initScale = Math.min(svgWidth / SIM_W, svgHeight / SIM_H) * 2.5;
+  const focusX = SIM_W * 0.30;
+  const focusY = SIM_H * 0.50;
+  const tx = svgWidth  / 2 - focusX * initScale;
+  const ty = svgHeight / 2 - focusY * initScale;
+  svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initScale));
+}
+
+init();
+</script>
+</body>
+</html>
