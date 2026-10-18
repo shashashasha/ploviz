@@ -451,9 +451,8 @@ const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
 const ARTIFACT_COLLISION_RADIUS = 6;
 
-// Paragraphs rated 3 get a slightly larger dot
-function artifactRadius(d)      { return d.score >= 3 ? 3 : ARTIFACT_RADIUS; }
-function artifactRadiusHover(d) { return d.score >= 3 ? 5 : ARTIFACT_RADIUS_HOVER; }
+// Higher-scoring paragraphs are slightly more opaque (score 1 → 0.55, 3 → 1)
+function artifactOpacity(d) { return ({ 1: 0.55, 2: 0.75, 3: 1 })[d.score] ?? 1; }
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -784,7 +783,7 @@ function buildProgramSimulation(visiblePlos) {
   // Similarity drives the layout: higher score = shorter, stronger link
   const similarScoreDist = { 1: 260, 2: 200, 3: 140, 4: 85, 5: 48 };
   const PLO_TETHER_DIST     = 160;
-  const PLO_TETHER_STRENGTH = 0.5;
+  const PLO_TETHER_STRENGTH = 0.6;
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
@@ -792,7 +791,7 @@ function buildProgramSimulation(visiblePlos) {
       .distance(d => d.linkType === 'similar' ? (similarScoreDist[d.score] || 260) : PLO_TETHER_DIST)
       .strength(d => d.linkType === 'similar' ? (d.score || 1) * 0.06 : PLO_TETHER_STRENGTH))
     .force('charge', d3.forceManyBody()
-      .strength(d => d.type === 'plo' ? -350 : d.type === 'manifestation' ? -320 : 0))
+      .strength(d => d.type === 'plo' ? -350 : d.type === 'manifestation' ? -380 : 0))
     .force('ploHomeX', d3.forceX(d => d.type === 'plo' ? ploCirclePos(d.id).x : SIM_W * 0.30)
       .strength(d => {
         if (d.type === 'plo') return 0.06;
@@ -1051,9 +1050,9 @@ function renderArtifactNodes() {
     .join(
       enter => enter.append('circle')
         .attr('class', 'artifact')
-        .attr('r', artifactRadius)
+        .attr('r', ARTIFACT_RADIUS)
         .attr('fill', INK)
-        .attr('fill-opacity', 1)
+        .attr('fill-opacity', artifactOpacity)
         .attr('stroke', 'none')
         .attr('cx', d => d.x || SIM_W * 0.65)
         .attr('cy', d => d.y || SIM_H * 0.5)
@@ -1061,11 +1060,11 @@ function renderArtifactNodes() {
         .on('mouseleave', () => {
           // Restore ALL artifact opacities — fixes the dimming-stuck bug
           d3.selectAll('circle.artifact')
-            .attr('r', artifactRadius)
+            .attr('r', ARTIFACT_RADIUS)
             .attr('stroke', 'none')
             .attr('fill-opacity', state.activeManifestationId
-              ? (n => n.targetManifestationId === state.activeManifestationId ? 1 : 0.15)
-              : 1);
+              ? (n => n.targetManifestationId === state.activeManifestationId ? artifactOpacity(n) : 0.15)
+              : artifactOpacity);
           hideTooltip();
         }),
       update => update,
@@ -1229,16 +1228,16 @@ function positionTooltip(event) {
 function highlightArtifactsForManifestation(mId) {
   state.activeManifestationId = mId;
   d3.selectAll('circle.artifact')
-    .attr('r',            d => d.targetManifestationId === mId ? artifactRadiusHover(d) : artifactRadius(d))
-    .attr('fill-opacity', d => d.targetManifestationId === mId ? 1 : 0.15);
+    .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
+    .attr('fill-opacity', d => d.targetManifestationId === mId ? artifactOpacity(d) : 0.15);
 }
 
 function clearManifestationHighlight() {
   state.activeManifestationId = null;
   d3.selectAll('circle.artifact')
-    .attr('r',            artifactRadius)
+    .attr('r',            ARTIFACT_RADIUS)
     .attr('fill',         INK)
-    .attr('fill-opacity', 1)
+    .attr('fill-opacity', artifactOpacity)
     .attr('stroke',       'none');
 }
 
@@ -1253,7 +1252,7 @@ function showArtifactTooltip(event, d) {
     .attr('fill-opacity', n => n === d ? 1 : 0.15);
 
   d3.select(event.currentTarget)
-    .attr('r', artifactRadiusHover(d))
+    .attr('r', ARTIFACT_RADIUS_HOVER)
     .attr('fill', INK)
     .attr('stroke', 'rgba(230,224,212,0.6)')
     .attr('stroke-width', 1.5)
