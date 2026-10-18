@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/schema/settings.json",
+  "model": "pratt-medium-fast",
+  "provider": {
+    "Pratt": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Pratt (Local)",
+      "options": {
+        "baseURL": "https://llm.pratt.edu/v1",
+        "apiKey": "{{PRATT_API_KEY}}"
+      },
+      "models": {
+        "pratt-high": { "name": "Pratt High" },
+        "pratt-medium-fast": { "name": "Pratt Medium Fast" },
+        "pratt-medium": { "name": "Pratt Medium" },
+        "pratt-agent": { "name": "Pratt Agent" },
+        "pratt-grok": { "name": "Grok 4.7" },
+        "pratt-deepseek-pro": { "name": "DeepSeek V4 Pro" },
+        "pratt-deepseek-flash": { "name": "DeepSeek V4.1 Flash 1017" },
+        "pratt-kimi": { "name": "Kimi K3" },
+        "pratt-nemo": { "name": "Nemotron 3.5 Super VL" },
+        "pratt-tencent": { "name": "Tencent Hy4 Preview" },
+        "pratt-qwen": { "name": "Qwen 3.8 Max" },
+        "pratt-muse-spark": { "name": "Muse Spark 1.3" },
+        "pratt-glm": { "name": "GLM-5.3 Flash" },
+        "pratt-mimo": { "name": "Mimo V2.6 Pro" },
+        "pratt-mistral": { "name": "Mistral Large 4" },
+        "pratt-step": { "name": "Step 5 Preview" },
+        "pratt-gemini": { "name": "Gemini 3.8 Flash" },
+        "pratt-student": { "name": "Pratt Student" }
+      }
+    }
+  }
+}
