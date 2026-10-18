@@ -270,7 +270,7 @@
       <h3>Legend</h3>
       <div class="legend-item"><span class="legend-ring"></span> Manifestation (size = evidence)</div>
       <div class="legend-item"><span class="legend-dot"></span> PLO</div>
-      <div class="legend-item"><span class="legend-dot-sm"></span> Evidence point (1–3 per paragraph)</div>
+      <div class="legend-item"><span class="legend-dot-sm"></span> Paragraph</div>
     </div>
     <div class="sidebar-section">
       <h3>Labels</h3>
@@ -451,6 +451,10 @@ const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
 const ARTIFACT_COLLISION_RADIUS = 6;
 
+// Paragraphs rated 3 get a slightly larger dot
+function artifactRadius(d)      { return d.score >= 3 ? 3 : ARTIFACT_RADIUS; }
+function artifactRadiusHover(d) { return d.score >= 3 ? 5 : ARTIFACT_RADIUS_HOVER; }
+
 /* ═══════════════════════════════════════════════════════════
    STATE
    ═══════════════════════════════════════════════════════════ */
@@ -482,7 +486,7 @@ function anonymizeRow(r) {
 }
 
 function artifactKey(a) {
-  return `${a.studentId}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a._instanceIdx}`;
+  return `${a.studentId}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}`;
 }
 
 function processData(rows, merge = false) {
@@ -491,13 +495,13 @@ function processData(rows, merge = false) {
   rows.forEach(r => {
     const base = anonymizeRow(r);
     PROGRAM_DATA.manifestations.forEach(m => {
+      // One node per paragraph per manifestation it scores on (zeros are skipped)
       const score = Math.max(0, Math.min(3, Math.round(+(base[m.scoreColumn]) || 0)));
-      for (let i = 0; i < score; i++) {
+      if (score > 0) {
         expanded.push({
           studentId:     base.studentId,
           thesis_title:  base.thesis_title,
           paragraph:     base.paragraph,
-          _instanceIdx:  i,
           targetManifestationId: m.id,
           targetPlo:     m.plo,
           score
@@ -1047,7 +1051,7 @@ function renderArtifactNodes() {
     .join(
       enter => enter.append('circle')
         .attr('class', 'artifact')
-        .attr('r', ARTIFACT_RADIUS)
+        .attr('r', artifactRadius)
         .attr('fill', INK)
         .attr('fill-opacity', 1)
         .attr('stroke', 'none')
@@ -1057,7 +1061,7 @@ function renderArtifactNodes() {
         .on('mouseleave', () => {
           // Restore ALL artifact opacities — fixes the dimming-stuck bug
           d3.selectAll('circle.artifact')
-            .attr('r', ARTIFACT_RADIUS)
+            .attr('r', artifactRadius)
             .attr('stroke', 'none')
             .attr('fill-opacity', state.activeManifestationId
               ? (n => n.targetManifestationId === state.activeManifestationId ? 1 : 0.15)
@@ -1225,14 +1229,14 @@ function positionTooltip(event) {
 function highlightArtifactsForManifestation(mId) {
   state.activeManifestationId = mId;
   d3.selectAll('circle.artifact')
-    .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
+    .attr('r',            d => d.targetManifestationId === mId ? artifactRadiusHover(d) : artifactRadius(d))
     .attr('fill-opacity', d => d.targetManifestationId === mId ? 1 : 0.15);
 }
 
 function clearManifestationHighlight() {
   state.activeManifestationId = null;
   d3.selectAll('circle.artifact')
-    .attr('r',            ARTIFACT_RADIUS)
+    .attr('r',            artifactRadius)
     .attr('fill',         INK)
     .attr('fill-opacity', 1)
     .attr('stroke',       'none');
@@ -1249,7 +1253,7 @@ function showArtifactTooltip(event, d) {
     .attr('fill-opacity', n => n === d ? 1 : 0.15);
 
   d3.select(event.currentTarget)
-    .attr('r', ARTIFACT_RADIUS_HOVER)
+    .attr('r', artifactRadiusHover(d))
     .attr('fill', INK)
     .attr('stroke', 'rgba(230,224,212,0.6)')
     .attr('stroke-width', 1.5)
