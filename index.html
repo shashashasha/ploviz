@@ -178,8 +178,8 @@
       color: var(--bg);
       border-radius: 3px;
       padding: 0.75rem 0.9rem;
-      max-width: 280px;
-      min-width: 190px;
+      max-width: 380px;
+      min-width: 220px;
       font-size: 0.72rem;
       line-height: 1.55;
       pointer-events: none;
@@ -198,7 +198,7 @@
       line-height: 1.6;
       margin-bottom: 6px;
       display: -webkit-box;
-      -webkit-line-clamp: 4;
+      -webkit-line-clamp: 6;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -1216,7 +1216,7 @@ const tooltipEl = document.getElementById('tooltip');
 function positionTooltip(event) {
   const wrap = document.getElementById('canvas-wrap');
   const rect = wrap.getBoundingClientRect();
-  const ttW = 280, ttH = tooltipEl.offsetHeight || 180;
+  const ttW = 380, ttH = tooltipEl.offsetHeight || 180;
   const margin = 14;
   let left = event.clientX - rect.left + margin;
   let top  = event.clientY - rect.top  + margin;
@@ -1260,7 +1260,7 @@ function showArtifactTooltip(event, d) {
     .attr('fill-opacity', 1);
 
   const excerpt = (d.paragraph || '').trim();
-  const snippetLength = 220;
+  const snippetLength = 420;
   const snippet = excerpt.length > snippetLength ? excerpt.slice(0, snippetLength) + '…' : excerpt;
 
   const plo = ploById(d.targetPlo);
