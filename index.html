@@ -783,15 +783,24 @@ function buildProgramSimulation(visiblePlos) {
   // Similarity drives the layout: higher score = shorter, stronger link
   const similarScoreDist = { 1: 260, 2: 200, 3: 140, 4: 85, 5: 48 };
   const PLO_TETHER_DIST     = 160;
-  const PLO_TETHER_STRENGTH = 0.6;
+  const PLO_TETHER_STRENGTH = 0.8;
+  // Similarity strength grows with score² so weak links pull much less: 1→0.012 … 5→0.30
+  const similarStrength = score => (score || 1) ** 2 * 0.012;
+
+  // Extra repulsion that only acts between PLO nodes, so it spreads the PLOs apart
+  // without pushing their own manifestations away
+  const ploRepel = d3.forceManyBody().strength(-1200);
+  const ploRepelInit = ploRepel.initialize;
+  ploRepel.initialize = (all, ...rest) => ploRepelInit(all.filter(n => n.type === 'plo'), ...rest);
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
       .id(d => d.id)
       .distance(d => d.linkType === 'similar' ? (similarScoreDist[d.score] || 260) : PLO_TETHER_DIST)
-      .strength(d => d.linkType === 'similar' ? (d.score || 1) * 0.06 : PLO_TETHER_STRENGTH))
+      .strength(d => d.linkType === 'similar' ? similarStrength(d.score) : PLO_TETHER_STRENGTH))
     .force('charge', d3.forceManyBody()
       .strength(d => d.type === 'plo' ? -350 : d.type === 'manifestation' ? -380 : 0))
+    .force('ploRepel', ploRepel)
     .force('ploHomeX', d3.forceX(d => d.type === 'plo' ? ploCirclePos(d.id).x : SIM_W * 0.30)
       .strength(d => {
         if (d.type === 'plo') return 0.06;
