@@ -783,8 +783,8 @@ function buildProgramSimulation(visiblePlos) {
 
   // Similarity drives the layout: higher score = shorter, stronger link
   const similarScoreDist = { 1: 260, 2: 200, 3: 140, 4: 85, 5: 48 };
-  const PLO_TETHER_DIST     = 240;
-  const PLO_TETHER_STRENGTH = 0.05;
+  const PLO_TETHER_DIST     = 160;
+  const PLO_TETHER_STRENGTH = 0.4;
 
   sim1 = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
