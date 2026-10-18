@@ -202,6 +202,11 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .tt-desc {
+      font-size: 0.68rem;
+      opacity: 0.8;
+      line-height: 1.6;
+    }
     .tt-scores-label {
       font-size: 0.6rem;
       font-weight: 500;
@@ -335,6 +340,7 @@ function normalizeProgram(data) {
         id:          m.id,
         title:       m.manifestation || m.id,
         shortLabel:  m.short_label || m.manifestation || m.id,
+        description: m.description || '',
         plo:         ploKey,
         similar,
         scoreColumn: `${ploKey}_${m.id}`,
@@ -897,11 +903,33 @@ function onTick() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   HOVER PAUSE — freeze both simulations while the pointer is on a node
+   ═══════════════════════════════════════════════════════════ */
+let _hoverPaused = false;
+let _dragging    = false;
+
+function pauseSimulations() {
+  if (_dragging) return;
+  _hoverPaused = true;
+  if (sim1) sim1.stop();
+  if (sim2) sim2.stop();
+}
+
+function resumeSimulations() {
+  if (!_hoverPaused) return;
+  _hoverPaused = false;
+  if (sim1) sim1.restart();
+  if (sim2) sim2.restart();
+}
+
+/* ═══════════════════════════════════════════════════════════
    DRAG
    ═══════════════════════════════════════════════════════════ */
 function makeDrag(simulation) {
   return d3.drag()
     .on('start', (event, d) => {
+      _dragging = true;
+      _hoverPaused = false;
       if (!event.active) simulation.alphaTarget(0.2).restart();
       if (sim2) sim2.alphaTarget(0.3).restart();
       d.fx = d.x; d.fy = d.y;
@@ -910,6 +938,7 @@ function makeDrag(simulation) {
       d.fx = event.x; d.fy = event.y;
     })
     .on('end', (event, d) => {
+      _dragging = false;
       if (!event.active) simulation.alphaTarget(0);
       if (sim2) sim2.alphaTarget(0);
       if (d.type !== 'plo') {
@@ -1001,7 +1030,8 @@ function renderAll() {
           .attr('fill',         d => d.type === 'manifestation' ? 'none' : INK)
           .attr('stroke',       INK)
           .attr('stroke-width', d => d.type === 'manifestation' ? 1.5 : 0)
-          .attr('fill-opacity', 1);
+          .attr('fill-opacity', 1)
+          .attr('pointer-events', 'all');   // hollow rings still catch hover/click inside
 
         // PLO label
         g.filter(d => d.type === 'plo')
@@ -1029,8 +1059,16 @@ function renderAll() {
             wrapTextLabel(this, wordsToLines(d.shortLabel.split(' '), 22), 14);
           });
 
-        g.on('mouseover', showProgramTooltip)
-         .on('mouseleave', hideTooltip);
+        g.on('mouseover', (event, d) => {
+            pauseSimulations();
+            showProgramTooltip(event, d);
+            if (d.type === 'manifestation') dimArtifactsExcept(d.id);
+          })
+         .on('mouseleave', (event, d) => {
+            if (d.type === 'manifestation') restoreArtifactStyles();
+            hideTooltip();
+            resumeSimulations();
+          });
 
         g.filter(d => d.type === 'manifestation')
           .style('cursor', 'pointer')
@@ -1071,16 +1109,15 @@ function renderArtifactNodes() {
         .attr('stroke', 'none')
         .attr('cx', d => d.x || SIM_W * 0.65)
         .attr('cy', d => d.y || SIM_H * 0.5)
-        .on('mouseover', showArtifactTooltip)
+        .on('mouseover', (event, d) => {
+          pauseSimulations();
+          showArtifactTooltip(event, d);
+        })
         .on('mouseleave', () => {
-          // Restore ALL artifact opacities — fixes the dimming-stuck bug
-          d3.selectAll('circle.artifact')
-            .attr('r', ARTIFACT_RADIUS)
-            .attr('stroke', 'none')
-            .attr('fill-opacity', state.activeManifestationId
-              ? (n => n.targetManifestationId === state.activeManifestationId ? artifactOpacity(n) : 0.15)
-              : artifactOpacity);
+          // Restore ALL artifact styles — fixes the dimming-stuck bug
+          restoreArtifactStyles();
           hideTooltip();
+          resumeSimulations();
         }),
       update => update,
       exit   => exit.transition().duration(180)
@@ -1240,20 +1277,30 @@ function positionTooltip(event) {
   tooltipEl.style.top  = Math.max(0, top)  + 'px';
 }
 
+// Temporary dimming while hovering a manifestation (doesn't change the click highlight)
+function dimArtifactsExcept(mId) {
+  d3.selectAll('circle.artifact')
+    .attr('fill-opacity', d => d.targetManifestationId === mId ? artifactOpacity(d) : 0.15);
+}
+
+// Re-apply the resting style: the clicked manifestation's highlight, or none
+function restoreArtifactStyles() {
+  const mId = state.activeManifestationId;
+  d3.selectAll('circle.artifact')
+    .attr('r',            d => mId && d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
+    .attr('fill',         INK)
+    .attr('stroke',       'none')
+    .attr('fill-opacity', d => !mId || d.targetManifestationId === mId ? artifactOpacity(d) : 0.15);
+}
+
 function highlightArtifactsForManifestation(mId) {
   state.activeManifestationId = mId;
-  d3.selectAll('circle.artifact')
-    .attr('r',            d => d.targetManifestationId === mId ? ARTIFACT_RADIUS_HOVER : ARTIFACT_RADIUS)
-    .attr('fill-opacity', d => d.targetManifestationId === mId ? artifactOpacity(d) : 0.15);
+  restoreArtifactStyles();
 }
 
 function clearManifestationHighlight() {
   state.activeManifestationId = null;
-  d3.selectAll('circle.artifact')
-    .attr('r',            ARTIFACT_RADIUS)
-    .attr('fill',         INK)
-    .attr('fill-opacity', artifactOpacity)
-    .attr('stroke',       'none');
+  restoreArtifactStyles();
 }
 
 function restoreProgNodes() {
@@ -1310,7 +1357,9 @@ function showProgramTooltip(event, d) {
     tooltipEl.innerHTML = `
       <div class="tt-title">${escapeHtml(d.title)}</div>
       <div class="tt-meta">${plo ? escapeHtml(plo.label + ' · ' + plo.title) : ''}</div>
-      <div class="tt-meta">${n} evidence point${n !== 1 ? 's' : ''}</div>`;
+      <div class="tt-meta">${n} paragraph${n !== 1 ? 's' : ''}</div>${d.description ? `
+      <hr class="tt-divider">
+      <div class="tt-desc">${escapeHtml(d.description)}</div>` : ''}`;
   }
   tooltipEl.classList.add('visible');
   positionTooltip(event);
