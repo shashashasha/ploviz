@@ -427,8 +427,8 @@ function nodeRadius(d) {
    MANIFESTATION RING SIZES — computed from visible artifacts, weighted by score
    ═══════════════════════════════════════════════════════════ */
 const SCORE_WEIGHT = { 1: 1, 2: 2, 3: 4 };   // a 3-rated paragraph counts as much as four 1s
-const RING_MIN = 10;
-const RING_MAX = 64;
+const RING_MIN = 8;
+const RING_MAX = 81;
 const RING_EXPONENT = 0.8;                   // closer to 1 = more contrast between rings
 
 function computeManifestationSizes() {
