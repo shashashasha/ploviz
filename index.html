@@ -789,9 +789,9 @@ function buildProgramSimulation(visiblePlos) {
   // Similarity drives the layout: higher score = shorter, stronger link
   const similarScoreDist = { 1: 260, 2: 200, 3: 140, 4: 85, 5: 48 };
   const PLO_TETHER_DIST     = 160;
-  const PLO_TETHER_STRENGTH = 0.8;
-  // Similarity strength grows with score² so weak links pull much less: 1→0.012 … 5→0.30
-  const similarStrength = score => (score || 1) ** 2 * 0.012;
+  const PLO_TETHER_STRENGTH = 1.0;
+  // Similarity strength grows with score³ so weak links barely pull: 1→0.0024 … 5→0.30
+  const similarStrength = score => (score || 1) ** 3 * 0.0024;
 
   // Extra repulsion that only acts between PLO nodes, so it spreads the PLOs apart
   // without pushing their own manifestations away
