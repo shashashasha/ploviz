@@ -329,6 +329,10 @@
           <input type="checkbox" id="toggle-evidence-spacing" checked>
           <span>Space by evidence</span>
         </label>
+        <label class="filter-item" title="Fix the four PLOs near the corners of the screen; unchecked, they move freely">
+          <input type="checkbox" id="toggle-plo-corners">
+          <span>Pin PLOs to corners</span>
+        </label>
       </div>
     </div>
     <div class="btn-load-wrap">
@@ -490,7 +494,8 @@ const state = {
   allArtifacts:          [],
   activeManifestationId: null,
   method:                'score',  // 'score' (0–5 rating per cell) | 'count' (evidence sentences per cell)
-  spaceByEvidence:       true      // busier manifestations push other manifestations away a little more
+  spaceByEvidence:       true,     // busier manifestations push other manifestations away a little more
+  ploCorners:            false     // pin the four PLOs near the corners of the screen
 };
 
 let svg, svgWidth, svgHeight, zoom;
@@ -597,7 +602,9 @@ function setupSVG() {
     .on('zoom', (event) => {
       const { x, y, k } = event.transform;
       zoomLayer.attr('transform', `translate(${x},${y}) scale(${k})`);
-    });
+    })
+    // Corner-pinned PLOs stay put relative to the screen, so re-pin them after a zoom or pan
+    .on('end', () => { if (state.ploCorners) applyPloCorners(0.2); });
 
   svg.call(zoom);
   svg.on('dblclick.zoom', null);
@@ -614,7 +621,8 @@ function setupSVG() {
     if (Math.abs(w - svgWidth) < 2 && Math.abs(h - svgHeight) < 2) return;
     svgWidth = w; svgHeight = h;
     svg.attr('width', svgWidth).attr('height', svgHeight);
-    if (sim1) sim1.alpha(0.2).restart();
+    if (state.ploCorners) applyPloCorners(0.2);
+    else if (sim1) sim1.alpha(0.2).restart();
   }).observe(wrap);
 }
 
@@ -1049,6 +1057,30 @@ function reheatProgram(alpha = 0.25) {
   if (!_hoverPaused && !_dragging) sim1.restart();
 }
 
+/* ═══════════════════════════════════════════════════════════
+   PLO CORNERS — with "Pin PLOs to corners" on, PLO A–D sit near the top-left, top-right,
+   bottom-left and bottom-right of the visible canvas (fractions of its width and height)
+   ═══════════════════════════════════════════════════════════ */
+const PLO_CORNERS = [[0.21, 0.19], [0.79, 0.20], [0.21, 0.82], [0.79, 0.82]];
+
+// Pin each visible PLO at its corner, converted from screen to simulation coordinates
+function applyPloCorners(alpha = 0.3) {
+  if (!sim1 || !svg) return;
+  const t = d3.zoomTransform(svg.node());
+  sim1.nodes().filter(n => n.type === 'plo').forEach(n => {
+    const idx = PROGRAM_DATA.plos.findIndex(p => p.id === n.id);
+    const [fx, fy] = PLO_CORNERS[Math.max(0, idx) % PLO_CORNERS.length];
+    [n.fx, n.fy] = t.invert([fx * svgWidth, fy * svgHeight]);
+  });
+  if (alpha) reheatProgram(alpha);
+}
+
+function unpinPlos() {
+  if (!sim1) return;
+  sim1.nodes().filter(n => n.type === 'plo').forEach(n => { n.fx = null; n.fy = null; });
+  reheatProgram(0.3);
+}
+
 function wrapTextLabel(textNode, lines, lineH) {
   const offsetY = -((lines.length - 1) * lineH) / 2;
   lines.forEach((line, i) => {
@@ -1247,6 +1279,7 @@ function updateFilters(authorOnly = false) {
     _programNodes       = nodes;
     _programLinks       = links;
     _manifestationNodes = manifestationNodes;
+    if (state.ploCorners) applyPloCorners(0);
   }
 
   const visible = getVisibleArtifacts();
@@ -1609,6 +1642,17 @@ evidenceSpacingToggle.addEventListener('change', e => {
   try { localStorage.setItem(EVIDENCE_SPACING_KEY, String(state.spaceByEvidence)); } catch (_) {}
   refreshProgramForces();
   reheatProgram(0.3);
+});
+
+const PLO_CORNERS_KEY = 'ploviz.ploCorners';
+const ploCornersToggle = document.getElementById('toggle-plo-corners');
+try { state.ploCorners = localStorage.getItem(PLO_CORNERS_KEY) === 'true'; } catch (_) {}
+ploCornersToggle.checked = state.ploCorners;
+ploCornersToggle.addEventListener('change', e => {
+  state.ploCorners = e.target.checked;
+  try { localStorage.setItem(PLO_CORNERS_KEY, String(state.ploCorners)); } catch (_) {}
+  if (state.ploCorners) applyPloCorners();
+  else unpinPlos();
 });
 </script>
 </body>
