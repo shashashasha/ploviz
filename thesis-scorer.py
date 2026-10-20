@@ -291,26 +291,53 @@ def parse_chat_json(text):
     text = (text or "").strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
     start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end < start:
+    if start < 0:
         raise ValueError("no JSON object in reply")
-    text = text[start:end + 1]
+    # A reply cut off before any closing brace keeps everything after the opening one
+    text = text[start:end + 1] if end > start else text[start:]
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Repair common slips: missing commas between objects/values, trailing commas
-        repaired = re.sub(r"([}\]\d\"])\s*\n?\s*([{\"])", r"\1,\2", text)
-        repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
-        return json.loads(repaired)
+        pass
+    # A reply cut off before its closing braces only needs them added
+    try:
+        return json.loads(close_brackets(text))
+    except json.JSONDecodeError:
+        pass
+    # Otherwise repair common slips: missing commas between objects/values and trailing commas
+    repaired = re.sub(r"([}\]\d\"])\s*\n?\s*([{\"])", r"\1,\2", text)
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+    return json.loads(close_brackets(repaired))
+
+
+def close_brackets(text):
+    """Append whatever closing brackets/braces an unbalanced JSON text is missing."""
+    stack, in_string, escaped = [], False, False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]" and stack:
+            stack.pop()
+    return text + "".join(reversed(stack))
 
 
 def chat_json(model_id, messages, api_key, state, parse):
-    """POST a chat request and return (parse(reply_json), cost), retrying once on an unparseable reply."""
+    """POST a chat request and return (parse(reply_json), cost), retrying twice on an unparseable reply."""
     cost = 0.0
     last_error = None
     attempts = 0
-    while attempts < 2:  # one retry if the reply can't be parsed
-        # The retry runs slightly warmer so a malformed reply isn't simply repeated
-        payload = {"model": model_id, "messages": messages, "temperature": 0.3 if attempts else 0,
+    temperatures = [0, 0.3, 0.6]  # retries run warmer so a malformed reply isn't simply repeated
+    while attempts < len(temperatures):
+        payload = {"model": model_id, "messages": messages, "temperature": temperatures[attempts],
                    "max_tokens": 8000}
         if state.get("json_mode", True):
             payload["response_format"] = {"type": "json_object"}

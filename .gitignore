@@ -10,3 +10,4 @@ data/artifacts_2025.csv
 data/theses_counted_2025_old.csv
 student_hash.json
 thesis_configs.json
+hash_students.py
