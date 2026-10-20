@@ -20,20 +20,19 @@ import pdfplumber
 
 OUTPUT_DIR = Path(__file__).parent
 
-THESIS_CONFIGS = [
-    {
-        "pdf_path": Path("/Users/sha/Downloads/drive-download-20260412T184509Z-3-001/Tong_Sha.pdf"),
-        "author": "Tong Sha",
-        "thesis_title": "THE DISPROPORTIONATE INFLUENCE OF ONLINE REVIEWS",
-        "output_csv": OUTPUT_DIR / "tong_sha_paragraphs.csv",
-    },
-    {
-        "pdf_path": Path("/Users/sha/Downloads/drive-download-20260412T184509Z-3-001/UrvaJoshi_Thesis2020May.pdf"),
-        "author": "Urva Joshi",
-        "thesis_title": "THE PARADOXES OF FAST FASHION: CAN WE OVERCOME A WICKED PROBLEM?",
-        "output_csv": OUTPUT_DIR / "urva_joshi_paragraphs.csv",
-    },
-]
+# Thesis PDFs to parse. Student names live in the git-ignored thesis_configs.json, a list of
+# {"pdf_path", "author", "thesis_title", "output_csv"} (output_csv is relative to this folder).
+# Run hash_students.py on the resulting CSVs before committing them.
+CONFIG_PATH = OUTPUT_DIR / "thesis_configs.json"
+
+
+def load_thesis_configs():
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        configs = json.load(f)
+    for c in configs:
+        c["pdf_path"] = Path(c["pdf_path"])
+        c["output_csv"] = OUTPUT_DIR / c["output_csv"]
+    return configs
 
 
 # ── Header/footer detection ───────────────────────────────────────────────────
@@ -313,7 +312,7 @@ def write_csv(paragraphs, author, thesis_title, output_path):
 def main():
     index = []
 
-    for config in THESIS_CONFIGS:
+    for config in load_thesis_configs():
         print(f"Parsing: {config['pdf_path'].name} ...")
         paragraphs, abstract = parse_thesis(config)
 

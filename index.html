@@ -54,6 +54,18 @@
       font-weight: 400;
       color: rgba(230,224,212,0.55);
     }
+    .model-select {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--bg);
+      background: transparent;
+      border: 1px solid rgba(230,224,212,0.35);
+      border-radius: 2px;
+      padding: 0.2rem 0.4rem;
+      cursor: pointer;
+    }
+    .model-select option { color: var(--text); background: var(--bg); }
+    .model-select option:disabled { color: rgba(26,25,22,0.35); }
 
     /* ─── Body Layout ────────────────────────────────────── */
     .app-body {
@@ -263,6 +275,12 @@
 <header class="app-header">
   <h1>Program Learning Outcomes</h1>
   <span class="header-badge" id="artifact-count">0 instances</span>
+  <select class="model-select" id="model-select" aria-label="Scoring model">
+    <option value="jev">Jev</option>
+    <option value="medium">Medium</option>
+    <option value="gemini">Gemini</option>
+    <option value="deepseek-pro">DeepSeek Pro</option>
+  </select>
 </header>
 
 <div class="app-body">
@@ -316,7 +334,15 @@ const PROGRAM_DATA = {
   manifestations: []   // all manifestations across every PLO
 };
 
-const EVIDENCE_LABELS = ['No evidence', 'Weak evidence', 'Moderate evidence', 'Strong evidence'];
+const EVIDENCE_LABELS = [
+  'No evidence',
+  'Low evidence, incidental to the paragraph',
+  'Some evidence, ancillary intent',
+  'Some evidence, related to the intent',
+  'Multiple notes of evidence, core intent',
+  'Very strong demonstration, core argument'
+];
+const MAX_SCORE = EVIDENCE_LABELS.length - 1;
 
 /* ═══════════════════════════════════════════════════════════
    NORMALIZE PLOs + MANIFESTATIONS
@@ -357,58 +383,10 @@ function ploById(id) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   STUDENT ANONYMIZATION
-   Each author + thesis title pair maps to a stable 6-letter ID derived
-   from a hash of their name initials and thesis-title initials.
+   STUDENTS
+   The author column already holds a hashed 6-letter ID (see hash_students.py),
+   so real names never reach the browser.
    ═══════════════════════════════════════════════════════════ */
-const STUDENT_IDS  = new Map();   // "author||title" → "QMRTXA"
-const USED_IDS     = new Set();
-
-function initialsOf(text) {
-  return (text || '')
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-    .map(w => w[0].toUpperCase())
-    .join('');
-}
-
-function hashToLetters(str, length = 6) {
-  // FNV-1a 32-bit, then base-26 letters
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  let out = '';
-  for (let i = 0; i < length; i++) {
-    out += String.fromCharCode(65 + (h % 26));
-    h = Math.floor(h / 26) ^ Math.imul(h, 0x9e3779b1) >>> 0;
-    h >>>= 0;
-  }
-  return out;
-}
-
-function assignStudentIds(rows) {
-  const keys = [...new Set(rows.map(r => `${(r.author || '').trim()}||${(r.thesis_title || '').trim()}`))]
-    .filter(k => !STUDENT_IDS.has(k))
-    .sort();
-  keys.forEach(key => {
-    const [author, title] = key.split('||');
-    const seed = initialsOf(author) + initialsOf(title);
-    let counter = 0, id;
-    do {
-      id = hashToLetters(counter ? `${seed}#${counter}` : seed);
-      counter++;
-    } while (USED_IDS.has(id));
-    USED_IDS.add(id);
-    STUDENT_IDS.set(key, id);
-  });
-}
-
-function studentIdFor(row) {
-  return STUDENT_IDS.get(`${(row.author || '').trim()}||${(row.thesis_title || '').trim()}`);
-}
-
 function studentLabel(id) {
   return `Student ${id}`;
 }
@@ -432,7 +410,7 @@ function nodeRadius(d) {
 /* ═══════════════════════════════════════════════════════════
    MANIFESTATION RING SIZES — computed from visible artifacts, weighted by score
    ═══════════════════════════════════════════════════════════ */
-const SCORE_WEIGHT = { 1: 1, 2: 2, 3: 4 };   // a 3-rated paragraph counts as much as four 1s
+const SCORE_WEIGHT = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };   // a 5-rated paragraph counts as much as eight 1s
 const RING_MIN = 8;
 const RING_MAX = 81;
 const RING_EXPONENT = 0.8;                   // closer to 1 = more contrast between rings
@@ -463,8 +441,8 @@ const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
 const ARTIFACT_COLLISION_RADIUS = 6;
 
-// Higher-scoring paragraphs are slightly more opaque (score 1 → 0.55, 3 → 1)
-function artifactOpacity(d) { return ({ 1: 0.55, 2: 0.75, 3: 1 })[d.score] ?? 1; }
+// Higher-scoring paragraphs are slightly more opaque (score 1 → 0.45, 5 → 1)
+function artifactOpacity(d) { return ({ 1: 0.45, 2: 0.6, 3: 0.75, 4: 0.88, 5: 1 })[d.score] ?? 1; }
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -489,9 +467,9 @@ let _artifactNodes = [];
    ═══════════════════════════════════════════════════════════ */
 const REQUIRED_COLS = ['author','thesis_title','paragraph'];
 
-// Replace real author names with anonymized student IDs; the author field is dropped.
+// The author column holds the hashed student ID; it becomes studentId.
 function anonymizeRow(r) {
-  const out = { ...r, studentId: studentIdFor(r) };
+  const out = { ...r, studentId: (r.author || '').trim() };
   delete out.author;
   return out;
 }
@@ -501,13 +479,12 @@ function artifactKey(a) {
 }
 
 function processData(rows, merge = false) {
-  assignStudentIds(rows);
   const expanded = [];
   rows.forEach(r => {
     const base = anonymizeRow(r);
     PROGRAM_DATA.manifestations.forEach(m => {
       // One node per paragraph per manifestation it scores on (zeros are skipped)
-      const score = Math.max(0, Math.min(3, Math.round(+(base[m.scoreColumn]) || 0)));
+      const score = Math.max(0, Math.min(MAX_SCORE, Math.round(+(base[m.scoreColumn]) || 0)));
       if (score > 0) {
         expanded.push({
           studentId:     base.studentId,
@@ -1331,7 +1308,7 @@ function showArtifactTooltip(event, d) {
     <div class="tt-meta">${escapeHtml(d.thesis_title)}</div>
     <hr class="tt-divider">
     <div class="tt-scores-label">${plo ? plo.label + ' · ' : ''}${mInfo ? escapeHtml(mInfo.title) : d.targetManifestationId}</div>
-    <div class="tt-meta">${EVIDENCE_LABELS[d.score] || ''} (${d.score}/3)</div>
+    <div class="tt-meta">${EVIDENCE_LABELS[d.score] || ''} (${d.score}/${MAX_SCORE})</div>
     <hr class="tt-divider">
     <div class="tt-excerpt">${escapeHtml(snippet)}</div>`;
 
@@ -1395,14 +1372,61 @@ document.getElementById('csv-input').addEventListener('change', async e => {
 /* ═══════════════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   MODEL PICKER — each model's scores live in data/theses_scored_<slug>.csv
+   ═══════════════════════════════════════════════════════════ */
+const MODEL_STORAGE_KEY = 'ploviz.model';
+const modelSelect = document.getElementById('model-select');
+
+function modelCsvPath(slug) { return `./data/theses_scored_${slug}.csv`; }
+
+async function fetchModelCsv(slug) {
+  try {
+    const res = await fetch(modelCsvPath(slug));
+    return res.ok ? await res.text() : null;
+  } catch (_) { return null; }   // file:// protocol
+}
+
+// Disable options whose CSV is missing; return the slug to start with
+async function setupModelPicker() {
+  const options = [...modelSelect.options];
+  await Promise.all(options.map(async o => {
+    try {
+      const res = await fetch(modelCsvPath(o.value), { method: 'HEAD' });
+      o.disabled = !res.ok;
+    } catch (_) { o.disabled = true; }
+    if (o.disabled) o.textContent += ' (not scored)';
+  }));
+  let saved = null;
+  try { saved = localStorage.getItem(MODEL_STORAGE_KEY); } catch (_) {}
+  const available = options.filter(o => !o.disabled).map(o => o.value);
+  const slug = available.includes(saved) ? saved : (available[0] || options[0].value);
+  modelSelect.value = slug;
+  return slug;
+}
+
+modelSelect.addEventListener('change', async () => {
+  const slug = modelSelect.value;
+  try { localStorage.setItem(MODEL_STORAGE_KEY, slug); } catch (_) {}
+  const csvText = await fetchModelCsv(slug);
+  if (csvText == null) { alert(`No scores found at ${modelCsvPath(slug)}`); return; }
+  state.allArtifacts = [];
+  state.visibleStudents.clear();
+  processData(d3.csvParse(csvText), false);
+  computeManifestationSizes();
+  renderSidebar();
+  updateFilters(false);
+});
+
 async function init() {
   let csvText = null;
   try {
-    const [csvRes, mRes] = await Promise.all([
-      fetch('./data/theses_scored.csv').catch(() => null),
+    const slug = await setupModelPicker();
+    const [csvTextRes, mRes] = await Promise.all([
+      fetchModelCsv(slug),
       fetch('./manifestations_new.json').catch(() => null)
     ]);
-    if (csvRes?.ok) csvText = await csvRes.text();
+    csvText = csvTextRes;
     if (mRes?.ok) {
       const { plos, manifestations } = normalizeProgram(await mRes.json());
       PROGRAM_DATA.plos = plos;
