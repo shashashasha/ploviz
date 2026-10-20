@@ -24,11 +24,21 @@ Outputs, per model slug:
 
 A count is the highest level k where P(level >= k) >= threshold.
 
+Count method (--method count): every paragraph is split into sentences, and each sentence is
+checked against every manifestation. A sentence whose confidence is at least --threshold
+(default 0.8) adds 1 to that manifestation's count. Jev answers one yes/no question per
+manifestation for each sentence; chat models rate numbered sentences in chunks of 40.
+
+    <prefix>_<slug>.csv            author, thesis_title, paragraph, PLO1_P1M01 ... (sentence counts)
+    <prefix>_<slug>_sentences.csv  one row per sentence with a confidence per manifestation
+
 Usage:
     python3 thesis-scorer.py data/theses_counted.csv manifestations_new.json
     python3 thesis-scorer.py data/theses_counted.csv manifestations_new.json --models jev,gemini --limit 5
     python3 thesis-scorer.py data/theses_counted.csv manifestations_new.json --resume
     python3 thesis-scorer.py --from-probs data/theses_scored_jev_probs.csv manifestations_new.json --threshold 0.7
+    python3 thesis-scorer.py data/theses_counted.csv manifestations_new.json --method count --models jev,gemini
+    python3 thesis-scorer.py --from-sentences data/theses_count_jev_sentences.csv manifestations_new.json --threshold 0.6
 
 The input CSV's author column should already be hashed (see hash_students.py).
 The API key is read from settings.json (provider.Pratt.options.apiKey); PRATT_API_KEY overrides it.
@@ -55,8 +65,10 @@ MODELS = {
     "medium":       {"id": "pratt-medium",       "kind": "chat"},
     "gemini":       {"id": "pratt-gemini",       "kind": "chat"},
     "deepseek-pro": {"id": "pratt-deepseek-pro", "kind": "chat"},
+    "qwen":         {"id": "pratt-qwen",         "kind": "chat"},
 }
 ID_COLUMNS = ["author", "thesis_title", "paragraph"]
+SENTENCE_ID_COLUMNS = ["author", "thesis_title", "paragraph_index", "sentence_index", "sentence"]
 LEVELS = [
     "No evidence of this manifestation",
     "Low evidence, or only incidental to the paragraph's intent",
@@ -73,6 +85,14 @@ READING_GUIDANCE = (
     "words while demonstrating nothing."
 )
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_THRESHOLD = {"score": 0.5, "count": 0.8}
+CHAT_CHUNK_SENTENCES = 40
+ABBREVIATIONS = {
+    "e.g", "i.e", "al", "etc", "vs", "cf", "dr", "mr", "mrs", "ms", "st", "prof", "jr", "sr",
+    "no", "vol", "pp", "p", "fig", "ed", "eds", "ch", "inc", "co", "ltd", "u.s", "u.k", "ca", "c",
+}
+# End punctuation, optional closing quotes/brackets, optional footnote number, then a sentence start
+SENTENCE_BREAK = re.compile(r"([.!?])([”\"’')\]]*)(\d{0,3})\s+(?=[A-Z“\"‘(\[])")
 
 csv.field_size_limit(sys.maxsize)
 print_lock = threading.Lock()
@@ -159,6 +179,40 @@ def usage_cost(response):
     return (response.get("usage") or {}).get("cost") or 0.0
 
 
+def split_sentences(paragraph):
+    """Split a paragraph into sentences, guarding against abbreviations, initials and decimals."""
+    text = re.sub(r"\s+", " ", paragraph or "").strip()
+    if not text:
+        return []
+    sentences, start = [], 0
+    for m in SENTENCE_BREAK.finditer(text):
+        if m.group(1) == ".":
+            word = re.search(r"([\w.]+)$", text[start:m.start()])
+            word = word.group(1).lower() if word else ""
+            # Abbreviations ("et al.", "e.g.") and single-letter initials ("J. Smith") don't end sentences
+            if word.rstrip(".") in ABBREVIATIONS or re.fullmatch(r"[a-z]", word):
+                continue
+        sentences.append(text[start:m.end(3)].strip())
+        start = m.end()
+    sentences.append(text[start:].strip())
+    # Merge fragments under 3 words into the following sentence (or the previous one at the end)
+    merged = []
+    carry = ""
+    for s in sentences:
+        s = f"{carry} {s}".strip() if carry else s
+        carry = ""
+        if len(s.split()) < 3:
+            carry = s
+        else:
+            merged.append(s)
+    if carry:
+        if merged:
+            merged[-1] = f"{merged[-1]} {carry}"
+        else:
+            merged.append(carry)
+    return merged
+
+
 def normalize(p, fallback_score=0):
     """Clamp to six non-negative values summing to 1; one-hot on fallback_score if empty."""
     p = [max(0.0, float(x or 0.0)) for x in (p or [])][:len(LEVELS)]
@@ -239,18 +293,25 @@ def parse_chat_json(text):
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end < start:
         raise ValueError("no JSON object in reply")
-    return json.loads(text[start:end + 1])
+    text = text[start:end + 1]
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Repair common slips: missing commas between objects/values, trailing commas
+        repaired = re.sub(r"([}\]\d\"])\s*\n?\s*([{\"])", r"\1,\2", text)
+        repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+        return json.loads(repaired)
 
 
-def score_chat(model_id, title, paragraph, manifestations, api_key, system_prompt, state):
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Thesis title: {title}\n\nParagraph:\n{paragraph}"},
-    ]
+def chat_json(model_id, messages, api_key, state, parse):
+    """POST a chat request and return (parse(reply_json), cost), retrying once on an unparseable reply."""
     cost = 0.0
     last_error = None
-    for _ in range(2):  # one retry if the reply can't be parsed
-        payload = {"model": model_id, "messages": messages, "temperature": 0, "max_tokens": 8000}
+    attempts = 0
+    while attempts < 2:  # one retry if the reply can't be parsed
+        # The retry runs slightly warmer so a malformed reply isn't simply repeated
+        payload = {"model": model_id, "messages": messages, "temperature": 0.3 if attempts else 0,
+                   "max_tokens": 8000}
         if state.get("json_mode", True):
             payload["response_format"] = {"type": "json_object"}
         try:
@@ -260,25 +321,168 @@ def score_chat(model_id, title, paragraph, manifestations, api_key, system_promp
                 state["json_mode"] = False  # model rejects response_format; ask in the prompt only
                 continue
             raise
+        attempts += 1
         cost += usage_cost(response)
         try:
             content = response["choices"][0]["message"]["content"]
-            data = parse_chat_json(content)
-            scores = data.get("scores") or {}
-            missing = [m["column"] for m in manifestations if m["column"] not in scores]
-            if missing:
-                raise ValueError(f"missing {len(missing)} manifestations, e.g. {missing[0]}")
-            results = {}
-            for m in manifestations:
-                s = scores[m["column"]] or {}
-                p = s.get("probabilities")
-                if isinstance(p, dict):
-                    p = [p.get(str(i), 0.0) for i in range(len(LEVELS))]
-                results[m["column"]] = normalize(p, s.get("score", 0))
-            return results, str(data.get("intent") or "").strip(), cost
+            return parse(parse_chat_json(content)), cost
         except (KeyError, IndexError, TypeError, ValueError, AttributeError) as e:
             last_error = e
     raise RuntimeError(f"Could not parse reply from {model_id}: {last_error}")
+
+
+def score_chat(model_id, title, paragraph, manifestations, api_key, system_prompt, state):
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Thesis title: {title}\n\nParagraph:\n{paragraph}"},
+    ]
+
+    def parse(data):
+        scores = data.get("scores") or {}
+        missing = [m["column"] for m in manifestations if m["column"] not in scores]
+        if missing:
+            raise ValueError(f"missing {len(missing)} manifestations, e.g. {missing[0]}")
+        results = {}
+        for m in manifestations:
+            s = scores[m["column"]] or {}
+            p = s.get("probabilities")
+            if isinstance(p, dict):
+                p = [p.get(str(i), 0.0) for i in range(len(LEVELS))]
+            results[m["column"]] = normalize(p, s.get("score", 0))
+        return results, str(data.get("intent") or "").strip()
+
+    (results, intent), cost = chat_json(model_id, messages, api_key, state, parse)
+    return results, intent, cost
+
+
+# ── Count method: sentence-level evidence ─────────────────────────────────────
+
+COUNT_GUIDANCE = (
+    "Judge the sentence by what it means within its paragraph, not by shared vocabulary: it is "
+    "evidence only if it actually demonstrates the manifestation's meaning as its description "
+    "defines it. A sentence can be evidence without using any words from the description, and "
+    "can use those words without being evidence."
+)
+
+
+def clamp01(x):
+    try:
+        return min(1.0, max(0.0, float(x)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def build_noul_question(m):
+    return {
+        "type": "noul",
+        "instructions": (
+            "The state is one sentence from a paragraph of a graduate communications design thesis, "
+            f"with its neighbouring sentences for context. {COUNT_GUIDANCE} "
+            f"Program learning outcome '{m['plo_title']}': {m['plo_description']} "
+            f"Manifestation '{m['name']}': {m['description']} "
+            "Is this sentence evidence of this manifestation?"
+        ),
+    }
+
+
+def count_decision(model_id, title, sentences, manifestations, api_key, workers):
+    """One /v1/systemone request per sentence; returns ([{column: confidence}] per sentence, cost)."""
+    questions = {m["column"]: build_noul_question(m) for m in manifestations}
+
+    def one(i):
+        state = {
+            "thesis_title": title,
+            "previous_sentence": sentences[i - 1] if i else "",
+            "sentence": sentences[i],
+            "next_sentence": sentences[i + 1] if i + 1 < len(sentences) else "",
+        }
+        response = post(SYSTEMONE_URL, {"model": model_id, "state": state, "questions": questions}, api_key)
+        answers = response.get("answers") or {}
+        conf = {}
+        for m in manifestations:
+            ans = answers.get(m["column"])
+            if not ans:
+                raise RuntimeError(f"No answer returned for {m['column']}")
+            conf[m["column"]] = clamp01(ans.get("noul"))
+        return conf, usage_cost(response)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(workers, len(sentences)))) as pool:
+        out = list(pool.map(one, range(len(sentences))))
+    return [c for c, _ in out], sum(x for _, x in out)
+
+
+def build_count_system_prompt(manifestations):
+    plos = {}
+    for m in manifestations:
+        plos.setdefault(m["plo_key"], {"title": m["plo_title"], "description": m["plo_description"], "items": []})
+        plos[m["plo_key"]]["items"].append(m)
+    blocks = []
+    for key, plo in plos.items():
+        lines = [f"{key}: {plo['title']} - {plo['description']}"]
+        lines += [f"  {m['column']}: {m['name']} - {m['description']}" for m in plo["items"]]
+        blocks.append("\n".join(lines))
+    return (
+        "You find sentence-level evidence of a design program's learning outcomes in graduate "
+        "communications design theses.\n\n"
+        f"How to read: first work out what the paragraph is arguing. {COUNT_GUIDANCE}\n\n"
+        "Manifestations, grouped by program learning outcome:\n\n" + "\n\n".join(blocks) + "\n\n"
+        "For each numbered sentence, give your confidence (0 to 1) that it is evidence of each "
+        "manifestation. List only manifestations with confidence of at least 0.3; leave out the rest.\n"
+        "Reply with JSON only, no prose or code fences, in this shape:\n"
+        '{"sentences": [{"n": 1, "evidence": {"PLO1_P1M01": 0.9, "PLO2_P2M03": 0.55}}, '
+        '{"n": 2, "evidence": {}}, ...]}\n'
+        "Include every sentence number, with an empty evidence object when there is none."
+    )
+
+
+def count_chat(model_id, title, sentences, manifestations, api_key, system_prompt, state):
+    """One chat request per chunk of up to CHAT_CHUNK_SENTENCES sentences."""
+    columns = [m["column"] for m in manifestations]
+    n_chunks = (len(sentences) + CHAT_CHUNK_SENTENCES - 1) // CHAT_CHUNK_SENTENCES
+
+    def rate(start, size, part_label):
+        chunk = sentences[start:start + size]
+        user = f"Thesis title: {title}\n\n"
+        if part_label:
+            user += f"{part_label} of a long paragraph ({len(sentences)} sentences).\n"
+        context = sentences[max(0, start - 2):start]
+        if context:
+            user += "Preceding sentences, for context only (do not rate them):\n" + "\n".join(context) + "\n\n"
+        user += "Sentences to rate:\n" + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(chunk))
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user}]
+
+        def parse(data):
+            rows = data["sentences"]
+            if not isinstance(rows, list):
+                raise ValueError("'sentences' is not a list")
+            by_n = {}
+            for r in rows:
+                by_n[int(r.get("n"))] = r.get("evidence") or {}
+            # Sentences the model left out have no evidence
+            return [{c: clamp01(by_n.get(i + 1, {}).get(c, 0.0)) for c in columns} for i in range(len(chunk))]
+
+        try:
+            return chat_json(model_id, messages, api_key, state, parse)
+        except FatalAPIError:
+            raise
+        except RuntimeError as e:
+            if size <= 5:
+                raise
+            # Malformed replies are sporadic; smaller chunks give shorter replies and a fresh prompt
+            log(f"  {model_id}: {e}; splitting {size} sentences in half", err=True)
+            half = size // 2
+            first, c1 = rate(start, half, part_label)
+            second, c2 = rate(start + half, size - half, part_label)
+            return first + second, c1 + c2
+
+    confs, cost = [], 0.0
+    for k, start in enumerate(range(0, len(sentences), CHAT_CHUNK_SENTENCES)):
+        size = min(CHAT_CHUNK_SENTENCES, len(sentences) - start)
+        label = f"This is part {k + 1} of {n_chunks}" if n_chunks > 1 else ""
+        chunk_confs, chunk_cost = rate(start, size, label)
+        confs.extend(chunk_confs)
+        cost += chunk_cost
+    return confs, cost
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
@@ -304,8 +508,13 @@ def prob_columns(manifestations):
     return cols
 
 
-def output_paths(prefix, slug):
-    return f"{prefix}_{slug}.csv", f"{prefix}_{slug}_probs.csv"
+def output_paths(prefix, slug, method="score"):
+    detail = "sentences" if method == "count" else "probs"
+    return f"{prefix}_{slug}.csv", f"{prefix}_{slug}_{detail}.csv"
+
+
+def sentence_columns(manifestations):
+    return SENTENCE_ID_COLUMNS + [m["column"] for m in manifestations]
 
 
 def rebuild_from_probs(probs_path, manifestations, output_path, threshold):
@@ -326,6 +535,48 @@ def rebuild_from_probs(probs_path, manifestations, output_path, threshold):
     print(f"Rebuilt {n} rows at threshold {threshold} -> {output_path}")
 
 
+def rebuild_from_sentences(sentences_path, manifestations, output_path, threshold, ids_path):
+    """Recount sentences at a new confidence threshold.
+
+    ID columns come from the existing counts CSV, or from ids_path (the theses input) if it's missing.
+    """
+    count_cols = [m["column"] for m in manifestations]
+    with open(sentences_path, newline="", encoding="utf-8") as f:
+        sentence_rows = list(csv.DictReader(f))
+    source = output_path if os.path.exists(output_path) else ids_path
+    with open(source, newline="", encoding="utf-8") as f:
+        id_rows = [{c: r[c] for c in ID_COLUMNS} for r in csv.DictReader(f)]
+    if source == ids_path and sentence_rows:
+        # Only the paragraphs the run reached
+        id_rows = id_rows[:max(int(r["paragraph_index"]) for r in sentence_rows) + 1]
+    counts = [{c: 0 for c in count_cols} for _ in id_rows]
+    for r in sentence_rows:
+        i = int(r["paragraph_index"])
+        for c in count_cols:
+            if float(r[c]) >= threshold:
+                counts[i][c] += 1
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=ID_COLUMNS + count_cols)
+        writer.writeheader()
+        for ids, c in zip(id_rows, counts):
+            writer.writerow({**ids, **c})
+    print(f"Rebuilt {len(id_rows)} rows at threshold {threshold} -> {output_path}")
+
+
+def truncate_sentences(path, keep_paragraphs):
+    """Drop sentence rows for paragraphs at or after keep_paragraphs, so resume appends cleanly."""
+    if not os.path.exists(path):
+        return
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fields = reader.fieldnames
+        kept = [r for r in reader if int(r["paragraph_index"]) < keep_paragraphs]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(kept)
+
+
 def count_existing_rows(path):
     if not os.path.exists(path):
         return 0
@@ -337,58 +588,93 @@ def count_existing_rows(path):
 
 def run_model(slug, rows, manifestations, args, api_key):
     spec = MODELS[slug]
-    counts_path, probs_path = output_paths(args.prefix, slug)
+    counting = args.method == "count"
+    counts_path, detail_path = output_paths(args.prefix, slug, args.method)
     count_cols = [m["column"] for m in manifestations]
-    system_prompt = build_system_prompt(manifestations) if spec["kind"] == "chat" else None
+    if spec["kind"] == "chat":
+        system_prompt = (build_count_system_prompt if counting else build_system_prompt)(manifestations)
     chat_state = {}
 
-    skip = min(count_existing_rows(counts_path), count_existing_rows(probs_path)) if args.resume else 0
+    skip = 0
+    if args.resume:
+        if counting:
+            skip = count_existing_rows(counts_path)
+            truncate_sentences(detail_path, skip)
+        else:
+            skip = min(count_existing_rows(counts_path), count_existing_rows(detail_path))
     if skip >= len(rows):
         log(f"[{slug}] already complete ({skip} rows)")
         return {"slug": slug, "rows": 0, "cost": 0.0, "status": "complete"}
-    log(f"[{slug}] {spec['id']}: {len(rows) - skip} paragraphs "
+    log(f"[{slug}] {spec['id']} ({args.method}): {len(rows) - skip} paragraphs "
         f"({'resuming at row ' + str(skip + 1) if skip else 'starting fresh'})")
 
     def score_row(row):
         paragraph = (row.get("paragraph") or "").strip()
+        title = (row.get("thesis_title") or "").strip()
+        if counting:
+            sentences = split_sentences(paragraph)
+            if not sentences:
+                return [], [], 0.0
+            if spec["kind"] == "decision":
+                confs, cost = count_decision(spec["id"], title, sentences, manifestations, api_key, args.sentence_workers)
+            else:
+                confs, cost = count_chat(spec["id"], title, sentences, manifestations, api_key, system_prompt, chat_state)
+            return sentences, confs, cost
         if not paragraph:
             return {c: normalize([], 0) for c in count_cols}, "", 0.0
-        title = (row.get("thesis_title") or "").strip()
         if spec["kind"] == "decision":
             return score_decision(spec["id"], title, paragraph, manifestations, api_key)
         return score_chat(spec["id"], title, paragraph, manifestations, api_key, system_prompt, chat_state)
 
+    def output_rows(i, ids, result):
+        """Return (counts row, detail rows) for one paragraph."""
+        count_row = dict(ids)
+        if counting:
+            sentences, confs, _ = result
+            for c in count_cols:
+                count_row[c] = sum(1 for conf in confs if conf[c] >= args.threshold)
+            details = []
+            for j, (sentence, conf) in enumerate(zip(sentences, confs)):
+                details.append({"author": ids["author"], "thesis_title": ids["thesis_title"],
+                                "paragraph_index": i, "sentence_index": j, "sentence": sentence,
+                                **{c: round(conf[c], 4) for c in count_cols}})
+            return count_row, details
+        results, intent, _ = result
+        prob_row = dict(ids, paragraph_intent=intent)
+        for m in manifestations:
+            p = results[m["column"]]
+            count_row[m["column"]] = to_count(p, args.threshold)
+            prob_row[f"{m['column']}_score"] = round(expected_score(p), 4)
+            for lvl, pv in enumerate(p):
+                prob_row[f"{m['column']}_p{lvl}"] = round(pv, 4)
+        return count_row, [prob_row]
+
+    detail_fields = sentence_columns(manifestations) if counting else ID_COLUMNS + prob_columns(manifestations)
     mode = "a" if skip else "w"
     done, cost, status = 0, 0.0, "complete"
     with open(counts_path, mode, newline="", encoding="utf-8") as fc, \
-         open(probs_path, mode, newline="", encoding="utf-8") as fp, \
+         open(detail_path, mode, newline="", encoding="utf-8") as fd, \
          concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         count_writer = csv.DictWriter(fc, fieldnames=ID_COLUMNS + count_cols)
-        prob_writer = csv.DictWriter(fp, fieldnames=ID_COLUMNS + prob_columns(manifestations))
+        detail_writer = csv.DictWriter(fd, fieldnames=detail_fields)
         if not skip:
             count_writer.writeheader()
-            prob_writer.writeheader()
+            detail_writer.writeheader()
 
         # map() yields in input order, so rows are written in order and --resume stays valid
         todo = rows[skip:]
         try:
-            for offset, (row, (results, intent, row_cost)) in enumerate(zip(todo, pool.map(score_row, todo))):
+            for offset, (row, result) in enumerate(zip(todo, pool.map(score_row, todo))):
                 i = skip + offset
                 ids = {c: row.get(c, "") for c in ID_COLUMNS}
-                count_row = dict(ids)
-                prob_row = dict(ids, paragraph_intent=intent)
-                for m in manifestations:
-                    p = results[m["column"]]
-                    count_row[m["column"]] = to_count(p, args.threshold)
-                    prob_row[f"{m['column']}_score"] = round(expected_score(p), 4)
-                    for lvl, pv in enumerate(p):
-                        prob_row[f"{m['column']}_p{lvl}"] = round(pv, 4)
+                count_row, details = output_rows(i, ids, result)
+                # Detail rows first: a paragraph is only "done" for --resume once its counts row exists
+                detail_writer.writerows(details)
+                fd.flush()
                 count_writer.writerow(count_row)
-                prob_writer.writerow(prob_row)
                 fc.flush()
-                fp.flush()
                 done += 1
-                cost += row_cost
+                cost += result[-1]
                 hits = sum(1 for c in count_cols if count_row[c] > 0)
                 log(f"[{slug}] [{i + 1}/{len(rows)}] {ids['author']}: {hits} manifestations with evidence")
         except FatalAPIError as e:
@@ -402,10 +688,10 @@ def run_model(slug, rows, manifestations, args, api_key):
 
     if not skip and not done:
         # Don't leave header-only files behind; index.html treats a present CSV as available
-        for path in (counts_path, probs_path):
+        for path in (counts_path, detail_path):
             os.remove(path)
     return {"slug": slug, "rows": done, "cost": cost, "status": status,
-            "counts": counts_path, "probs": probs_path}
+            "counts": counts_path, "detail": detail_path}
 
 
 def main():
@@ -414,16 +700,32 @@ def main():
     parser.add_argument("manifestations", help="Manifestations JSON (e.g. manifestations_new.json)")
     parser.add_argument("--models", default=",".join(MODELS),
                         help=f"Comma-separated model slugs to run in parallel (default: all of {', '.join(MODELS)})")
-    parser.add_argument("--prefix", default=os.path.join("data", "theses_scored"),
-                        help="Output path prefix; files are <prefix>_<model>.csv and <prefix>_<model>_probs.csv")
+    parser.add_argument("--method", choices=["score", "count"], default="score",
+                        help="score: one 0-5 rating per paragraph; count: sentences with evidence per paragraph")
+    parser.add_argument("--prefix", help="Output path prefix (default data/theses_scored for score, data/theses_count "
+                                         "for count); files are <prefix>_<model>.csv plus _probs or _sentences")
     parser.add_argument("--workers", type=int, default=4, help="Paragraphs in flight per model (default 4)")
-    parser.add_argument("--threshold", type=float, default=0.5, help="Cutoff for P(level >= k) when assigning counts (default 0.5)")
+    parser.add_argument("--sentence-workers", type=int, default=4,
+                        help="Count method with Jev: sentence requests in flight per paragraph (default 4)")
+    parser.add_argument("--threshold", type=float,
+                        help="score: cutoff for P(level >= k) (default 0.5); count: sentence confidence cutoff (default 0.8)")
     parser.add_argument("--limit", type=int, help="Only score the first N paragraphs")
     parser.add_argument("--resume", action="store_true", help="Skip rows already present in each model's output files")
     parser.add_argument("--settings", default=os.path.join(SCRIPT_DIR, "settings.json"), help="Path to settings.json")
     parser.add_argument("--from-probs", action="store_true", help="Rebuild counts from an existing probs CSV without calling the API")
-    parser.add_argument("-o", "--output", help="With --from-probs: counts CSV to write (default: the probs path without _probs)")
+    parser.add_argument("--from-sentences", action="store_true",
+                        help="Recount an existing sentences CSV at --threshold without calling the API")
+    parser.add_argument("--ids", default=os.path.join("data", "theses_counted.csv"),
+                        help="With --from-sentences: theses CSV for author/title/paragraph when the counts CSV is missing")
+    parser.add_argument("-o", "--output", help="With --from-probs/--from-sentences: counts CSV to write "
+                                               "(default: the input path without _probs/_sentences)")
     args = parser.parse_args()
+    if args.from_sentences:
+        args.method = "count"
+    if args.threshold is None:
+        args.threshold = DEFAULT_THRESHOLD[args.method]
+    if args.prefix is None:
+        args.prefix = os.path.join("data", "theses_count" if args.method == "count" else "theses_scored")
 
     if not 0.0 < args.threshold <= 1.0:
         sys.exit("Error: --threshold must be in (0, 1].")
@@ -435,6 +737,12 @@ def main():
         if output == args.input:
             sys.exit("Error: pass -o; could not derive a counts path from the probs path.")
         rebuild_from_probs(args.input, manifestations, output, args.threshold)
+        return
+    if args.from_sentences:
+        output = args.output or re.sub(r"_sentences(\.csv)?$", r"\1", args.input)
+        if output == args.input:
+            sys.exit("Error: pass -o; could not derive a counts path from the sentences path.")
+        rebuild_from_sentences(args.input, manifestations, output, args.threshold, args.ids)
         return
 
     slugs = [s.strip() for s in args.models.split(",") if s.strip()]
@@ -452,7 +760,7 @@ def main():
     if args.limit:
         rows = rows[:args.limit]
 
-    print(f"{len(rows)} paragraphs x {len(manifestations)} manifestations x {len(slugs)} models")
+    print(f"{len(rows)} paragraphs x {len(manifestations)} manifestations x {len(slugs)} models ({args.method})")
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(slugs)) as pool:
         summaries = list(pool.map(lambda s: run_model(s, rows, manifestations, args, api_key), slugs))
 
@@ -460,7 +768,7 @@ def main():
     for s in summaries:
         print(f"  {s['slug']:<13} {s['rows']:>4} rows  ${s['cost']:.4f}  {s['status']}")
         if s.get("counts") and s["rows"]:
-            print(f"  {'':<13} -> {s['counts']}, {s['probs']}")
+            print(f"  {'':<13} -> {s['counts']}, {s['detail']}")
 
 
 if __name__ == "__main__":

@@ -276,10 +276,20 @@
   <h1>Program Learning Outcomes</h1>
   <span class="header-badge" id="artifact-count">0 instances</span>
   <select class="model-select" id="model-select" aria-label="Scoring model">
-    <option value="jev">Jev</option>
-    <option value="medium">Medium</option>
-    <option value="gemini">Gemini</option>
-    <option value="deepseek-pro">DeepSeek Pro</option>
+    <optgroup label="Score">
+      <option value="score:jev">Jev</option>
+      <option value="score:medium">Medium</option>
+      <option value="score:gemini">Gemini</option>
+      <option value="score:deepseek-pro">DeepSeek Pro</option>
+      <option value="score:qwen">Qwen</option>
+    </optgroup>
+    <optgroup label="Count">
+      <option value="count:jev">Jev</option>
+      <option value="count:medium">Medium</option>
+      <option value="count:gemini">Gemini</option>
+      <option value="count:deepseek-pro">DeepSeek Pro</option>
+      <option value="count:qwen">Qwen</option>
+    </optgroup>
   </select>
 </header>
 
@@ -441,8 +451,11 @@ const ARTIFACT_RADIUS           = 2;
 const ARTIFACT_RADIUS_HOVER     = 4;
 const ARTIFACT_COLLISION_RADIUS = 6;
 
-// Higher-scoring paragraphs are slightly more opaque (score 1 → 0.45, 5 → 1)
-function artifactOpacity(d) { return ({ 1: 0.45, 2: 0.6, 3: 0.75, 4: 0.88, 5: 1 })[d.score] ?? 1; }
+// Higher-scoring paragraphs are slightly more opaque (score 1 → 0.45, 5 → 1); count nodes have no score
+function artifactOpacity(d) {
+  if (d.score === undefined) return 0.75;
+  return ({ 1: 0.45, 2: 0.6, 3: 0.75, 4: 0.88, 5: 1 })[d.score] ?? 1;
+}
 
 /* ═══════════════════════════════════════════════════════════
    STATE
@@ -451,7 +464,8 @@ const state = {
   visiblePlos:           new Set(),
   visibleStudents:       new Set(),
   allArtifacts:          [],
-  activeManifestationId: null
+  activeManifestationId: null,
+  method:                'score'   // 'score' (0–5 rating per cell) | 'count' (evidence sentences per cell)
 };
 
 let svg, svgWidth, svgHeight, zoom;
@@ -475,14 +489,31 @@ function anonymizeRow(r) {
 }
 
 function artifactKey(a) {
-  return `${a.studentId}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}`;
+  return `${a.studentId}||${(a.paragraph||'').slice(0,60)}||${a.targetManifestationId}||${a.count_index ?? ''}`;
 }
+
+const MAX_COUNT_PER_CELL = 300;   // sanity cap; the longest paragraph has about 250 sentences
 
 function processData(rows, merge = false) {
   const expanded = [];
   rows.forEach(r => {
     const base = anonymizeRow(r);
     PROGRAM_DATA.manifestations.forEach(m => {
+      if (state.method === 'count') {
+        // One node per evidence sentence: n nodes for a cell holding count n
+        const n = Math.max(0, Math.min(MAX_COUNT_PER_CELL, Math.round(+(base[m.scoreColumn]) || 0)));
+        for (let i = 0; i < n; i++) {
+          expanded.push({
+            studentId:     base.studentId,
+            thesis_title:  base.thesis_title,
+            paragraph:     base.paragraph,
+            targetManifestationId: m.id,
+            targetPlo:     m.plo,
+            count_index:   i
+          });
+        }
+        return;
+      }
       // One node per paragraph per manifestation it scores on (zeros are skipped)
       const score = Math.max(0, Math.min(MAX_SCORE, Math.round(+(base[m.scoreColumn]) || 0)));
       if (score > 0) {
@@ -1096,7 +1127,11 @@ function renderArtifactNodes() {
           hideTooltip();
           resumeSimulations();
         }),
-      update => update,
+      // _uids restart at 0 on a model switch, so reused circles may now hold a different artifact
+      update => update.attr('fill-opacity', d => {
+        const mId = state.activeManifestationId;
+        return !mId || d.targetManifestationId === mId ? artifactOpacity(d) : 0.15;
+      }),
       exit   => exit.transition().duration(180)
         .attr('r', 0)
         .attr('fill-opacity', 0)
@@ -1308,8 +1343,8 @@ function showArtifactTooltip(event, d) {
     <div class="tt-meta">${escapeHtml(d.thesis_title)}</div>
     <hr class="tt-divider">
     <div class="tt-scores-label">${plo ? plo.label + ' · ' : ''}${mInfo ? escapeHtml(mInfo.title) : d.targetManifestationId}</div>
-    <div class="tt-meta">${EVIDENCE_LABELS[d.score] || ''} (${d.score}/${MAX_SCORE})</div>
-    <hr class="tt-divider">
+${d.score !== undefined ? `    <div class="tt-meta">${EVIDENCE_LABELS[d.score] || ''} (${d.score}/${MAX_SCORE})</div>
+` : ''}    <hr class="tt-divider">
     <div class="tt-excerpt">${escapeHtml(snippet)}</div>`;
 
   tooltipEl.classList.add('visible');
@@ -1373,12 +1408,22 @@ document.getElementById('csv-input').addEventListener('change', async e => {
    INIT
    ═══════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════
-   MODEL PICKER — each model's scores live in data/theses_scored_<slug>.csv
+   MODEL PICKER — option values are "<method>:<model>"; scores live in
+   data/theses_scored_<model>.csv, counts in data/theses_count_<model>.csv
    ═══════════════════════════════════════════════════════════ */
 const MODEL_STORAGE_KEY = 'ploviz.model';
 const modelSelect = document.getElementById('model-select');
 
-function modelCsvPath(slug) { return `./data/theses_scored_${slug}.csv`; }
+// An old saved bare slug like "jev" means "score:jev"
+function parseModelValue(value) {
+  const [method, model] = value.includes(':') ? value.split(':') : ['score', value];
+  return { method, model };
+}
+
+function modelCsvPath(value) {
+  const { method, model } = parseModelValue(value);
+  return method === 'count' ? `./data/theses_count_${model}.csv` : `./data/theses_scored_${model}.csv`;
+}
 
 async function fetchModelCsv(slug) {
   try {
@@ -1400,8 +1445,10 @@ async function setupModelPicker() {
   let saved = null;
   try { saved = localStorage.getItem(MODEL_STORAGE_KEY); } catch (_) {}
   const available = options.filter(o => !o.disabled).map(o => o.value);
+  if (saved && !saved.includes(':')) saved = `score:${saved}`;
   const slug = available.includes(saved) ? saved : (available[0] || options[0].value);
   modelSelect.value = slug;
+  state.method = parseModelValue(slug).method;
   return slug;
 }
 
@@ -1410,6 +1457,7 @@ modelSelect.addEventListener('change', async () => {
   try { localStorage.setItem(MODEL_STORAGE_KEY, slug); } catch (_) {}
   const csvText = await fetchModelCsv(slug);
   if (csvText == null) { alert(`No scores found at ${modelCsvPath(slug)}`); return; }
+  state.method = parseModelValue(slug).method;
   state.allArtifacts = [];
   state.visibleStudents.clear();
   processData(d3.csvParse(csvText), false);
