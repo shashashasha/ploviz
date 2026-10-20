@@ -1059,9 +1059,16 @@ function reheatProgram(alpha = 0.25) {
 
 /* ═══════════════════════════════════════════════════════════
    PLO CORNERS — with "Pin PLOs to corners" on, PLO A–D sit near the top-left, top-right,
-   bottom-left and bottom-right of the visible canvas (fractions of its width and height)
+   bottom-left and bottom-right of the visible canvas, each the same inset from its own corner,
+   so A/B and C/D share a row and A/C and B/D share a column
    ═══════════════════════════════════════════════════════════ */
-const PLO_CORNERS = [[0.21, 0.19], [0.79, 0.20], [0.21, 0.82], [0.79, 0.82]];
+const PLO_CORNER_INSET = 0.2;   // fraction of the canvas width (x) and height (y) in from each corner
+const PLO_CORNERS = [
+  [PLO_CORNER_INSET,     PLO_CORNER_INSET],       // PLO A, top-left
+  [1 - PLO_CORNER_INSET, PLO_CORNER_INSET],       // PLO B, top-right
+  [PLO_CORNER_INSET,     1 - PLO_CORNER_INSET],   // PLO C, bottom-left
+  [1 - PLO_CORNER_INSET, 1 - PLO_CORNER_INSET]    // PLO D, bottom-right
+];
 
 // Pin each visible PLO at its corner, converted from screen to simulation coordinates
 function applyPloCorners(alpha = 0.3) {
