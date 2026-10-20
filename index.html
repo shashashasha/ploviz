@@ -896,7 +896,7 @@ function buildArtifactSimulation(visibleArtifacts, manifestationNodes) {
 /* ═══════════════════════════════════════════════════════════
    TICK HANDLER
    ═══════════════════════════════════════════════════════════ */
-function onTick() {
+function redrawProgram() {
   if (progLinkSel) {
     progLinkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
@@ -905,6 +905,10 @@ function onTick() {
   if (progNodeSel) {
     progNodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
   }
+}
+
+function onTick() {
+  redrawProgram();
   if (artNodeSel) {
     artNodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
   }
@@ -933,21 +937,26 @@ function resumeSimulations() {
 /* ═══════════════════════════════════════════════════════════
    DRAG
    ═══════════════════════════════════════════════════════════ */
-function makeDrag(simulation) {
+// Uses the current sim1/sim2 at event time: both are rebuilt on every filter or model change,
+// so a simulation captured when the node was first drawn can be stale (and stopped by the hover pause)
+function makeDrag() {
   return d3.drag()
     .on('start', (event, d) => {
       _dragging = true;
       _hoverPaused = false;
-      if (!event.active) simulation.alphaTarget(0.2).restart();
+      if (!event.active && sim1) sim1.alphaTarget(0.2).restart();
       if (sim2) sim2.alphaTarget(0.3).restart();
       d.fx = d.x; d.fy = d.y;
     })
     .on('drag', (event, d) => {
       d.fx = event.x; d.fy = event.y;
+      // Move the node and its links right away, even before the next simulation tick
+      d.x = event.x; d.y = event.y;
+      redrawProgram();
     })
     .on('end', (event, d) => {
       _dragging = false;
-      if (!event.active) simulation.alphaTarget(0);
+      if (!event.active && sim1) sim1.alphaTarget(0);
       if (sim2) sim2.alphaTarget(0);
       if (d.type !== 'plo') {
         d.fx = null; d.fy = null;
@@ -1029,7 +1038,7 @@ function renderAll() {
         const g = enter.append('g')
           .attr('class', d => `prog-node prog-node--${d.type}`)
           .style('cursor', 'grab')
-          .call(makeDrag(sim1));
+          .call(makeDrag());
 
         // Manifestation: hollow ring; PLO: solid dot
         g.append('circle')
