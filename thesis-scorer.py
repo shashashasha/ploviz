@@ -372,15 +372,25 @@ def clamp01(x):
         return 0.0
 
 
+# Jev's count question reads for the sentence's intent: supporting concepts count, not only full demonstrations
+JEV_COUNT_GUIDANCE = (
+    "Judge the intent of the sentence within its paragraph. Answer yes if the sentence mentions or "
+    "uses a concept that supports this manifestation, or if what the sentence is doing is evidence "
+    "of the intent behind the manifestation's description. The sentence does not need to fully "
+    "demonstrate the manifestation or use any words from its description. Answer no only if the "
+    "sentence's intent has nothing to do with the manifestation."
+)
+
+
 def build_noul_question(m):
     return {
         "type": "noul",
         "instructions": (
             "The state is one sentence from a paragraph of a graduate communications design thesis, "
-            f"with its neighbouring sentences for context. {COUNT_GUIDANCE} "
+            f"with its neighbouring sentences for context. {JEV_COUNT_GUIDANCE} "
             f"Program learning outcome '{m['plo_title']}': {m['plo_description']} "
             f"Manifestation '{m['name']}': {m['description']} "
-            "Is this sentence evidence of this manifestation?"
+            "Does the intent of this sentence support, or give evidence of, this manifestation?"
         ),
     }
 
