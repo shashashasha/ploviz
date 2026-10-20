@@ -322,6 +322,15 @@
       <h3>Students</h3>
       <div class="filter-list" id="author-filters"></div>
     </div>
+    <div class="sidebar-section">
+      <h3>Layout</h3>
+      <div class="filter-list">
+        <label class="filter-item" title="Manifestations with more evidence push other manifestations away a little more, leaving room for their paragraphs">
+          <input type="checkbox" id="toggle-evidence-spacing" checked>
+          <span>Space by evidence</span>
+        </label>
+      </div>
+    </div>
     <div class="btn-load-wrap">
       <label class="btn-load" for="csv-input">+ Load CSV</label>
       <input type="file" id="csv-input" accept=".csv" style="display:none" />
@@ -434,10 +443,25 @@ function computeManifestationSizes() {
   });
   const vals = Object.values(weights);
   const maxWeight = vals.length ? Math.max(...vals) : 1;
+  // Evidence spacing is measured against the range with every student shown (visible PLOs only),
+  // so hiding students lowers the weights and the layout visibly contracts
+  const allCounts = {};
+  state.allArtifacts.forEach(a => {
+    if (state.visiblePlos.has(a.targetPlo)) allCounts[a.targetManifestationId] = (allCounts[a.targetManifestationId] || 0) + 1;
+  });
+  const refCounts = PROGRAM_DATA.manifestations
+    .filter(m => state.visiblePlos.has(m.plo))
+    .map(m => allCounts[m.id] || 0);
+  const minCount = refCounts.length ? Math.min(...refCounts) : 0;
+  const maxCount = refCounts.length ? Math.max(...refCounts) : 0;
   const apply = m => {
     m._count = counts[m.id] || 0;
     const w = weights[m.id] || 0;
     m._nodeRadius = RING_MIN + Math.pow(w / maxWeight, RING_EXPONENT) * (RING_MAX - RING_MIN);
+    // 0 at the quietest manifestation's full count (or less), 1 at the busiest one's
+    m._spaceWeight = maxCount > minCount
+      ? Math.max(0, Math.min(1, (m._count - minCount) / (maxCount - minCount)))
+      : 0;
   };
   PROGRAM_DATA.manifestations.forEach(apply);
   // Keep live simulation node copies in sync so rings resize on student-only filtering
@@ -465,7 +489,8 @@ const state = {
   visibleStudents:       new Set(),
   allArtifacts:          [],
   activeManifestationId: null,
-  method:                'score'   // 'score' (0–5 rating per cell) | 'count' (evidence sentences per cell)
+  method:                'score',  // 'score' (0–5 rating per cell) | 'count' (evidence sentences per cell)
+  spaceByEvidence:       true      // busier manifestations push other manifestations away a little more
 };
 
 let svg, svgWidth, svgHeight, zoom;
@@ -818,8 +843,7 @@ function buildProgramSimulation(visiblePlos) {
       .id(d => d.id)
       .distance(d => d.linkType === 'similar' ? (similarScoreDist[d.score] || 260) : PLO_TETHER_DIST)
       .strength(d => d.linkType === 'similar' ? similarStrength(d.score) : PLO_TETHER_STRENGTH))
-    .force('charge', d3.forceManyBody()
-      .strength(d => d.type === 'plo' ? -350 : d.type === 'manifestation' ? -380 : 0))
+    .force('charge', d3.forceManyBody().strength(programCharge))
     .force('ploRepel', ploRepel)
     .force('ploHomeX', d3.forceX(d => d.type === 'plo' ? ploCirclePos(d.id).x : SIM_W * 0.30)
       .strength(d => {
@@ -840,7 +864,7 @@ function buildProgramSimulation(visiblePlos) {
         return 0;
       }))
     .force('collide', d3.forceCollide()
-      .radius(d => d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6)
+      .radius(programCollideRadius)
       .strength(0.8))
     .force('boundary', boundaryForce(() => SIM_W, () => SIM_H, 10))
     .alphaDecay(0.005)
@@ -984,8 +1008,45 @@ function wordsToLines(words, maxChars) {
 }
 
 // Collision radius for manifestation nodes in sim1 — ring radius + orbit buffer
+/* ═══════════════════════════════════════════════════════════
+   EVIDENCE SPACING — with "Space by evidence" on, a manifestation with more visible
+   evidence keeps a little more room around it, scaled by its share of the busiest one
+   ═══════════════════════════════════════════════════════════ */
+const EVIDENCE_SPACE_PAD     = 32;   // extra collision padding for the busiest manifestation
+const EVIDENCE_CHARGE_BOOST  = 0.4;  // busiest manifestation repels 1.4× as hard
+const MANIFESTATION_CHARGE   = -380;
+
+function evidenceSpaceWeight(d) {
+  return state.spaceByEvidence ? (d._spaceWeight || 0) : 0;
+}
+
 function manifestationCollideRadius(d) {
-  return nodeRadius(d) + 24;
+  return nodeRadius(d) + 24 + EVIDENCE_SPACE_PAD * evidenceSpaceWeight(d);
+}
+
+function programCharge(d) {
+  if (d.type === 'plo') return -350;
+  if (d.type === 'manifestation') return MANIFESTATION_CHARGE * (1 + EVIDENCE_CHARGE_BOOST * evidenceSpaceWeight(d));
+  return 0;
+}
+
+function programCollideRadius(d) {
+  return d.type === 'manifestation' ? manifestationCollideRadius(d) : nodeRadius(d) + 6;
+}
+
+// d3 caches per-node radius/strength when a force initializes; re-setting them re-reads the weights
+function refreshProgramForces() {
+  if (!sim1) return;
+  sim1.force('charge').strength(programCharge);
+  sim1.force('collide').radius(programCollideRadius);
+}
+
+// Ease the program layout toward the new spacing; while hover/drag has it paused, just raise
+// alpha so resumeSimulations() picks it up
+function reheatProgram(alpha = 0.25) {
+  if (!sim1) return;
+  sim1.alpha(Math.max(sim1.alpha(), alpha));
+  if (!_hoverPaused && !_dragging) sim1.restart();
 }
 
 function wrapTextLabel(textNode, lines, lineH) {
@@ -1194,6 +1255,11 @@ function updateFilters(authorOnly = false) {
 
   renderAll();
   startSimulations(!authorOnly);
+  // Student-only changes keep the program layout, so re-read the evidence weights and let it settle
+  if (authorOnly && state.spaceByEvidence) {
+    refreshProgramForces();
+    reheatProgram();
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1529,6 +1595,20 @@ document.getElementById('toggle-manifestation-labels').addEventListener('change'
 });
 document.getElementById('toggle-plo-labels').addEventListener('change', e => {
   document.getElementById('main-svg').classList.toggle('hide-plo-labels', !e.target.checked);
+});
+
+const EVIDENCE_SPACING_KEY = 'ploviz.spaceByEvidence';
+const evidenceSpacingToggle = document.getElementById('toggle-evidence-spacing');
+try {
+  const saved = localStorage.getItem(EVIDENCE_SPACING_KEY);
+  if (saved !== null) state.spaceByEvidence = saved === 'true';
+} catch (_) {}
+evidenceSpacingToggle.checked = state.spaceByEvidence;
+evidenceSpacingToggle.addEventListener('change', e => {
+  state.spaceByEvidence = e.target.checked;
+  try { localStorage.setItem(EVIDENCE_SPACING_KEY, String(state.spaceByEvidence)); } catch (_) {}
+  refreshProgramForces();
+  reheatProgram(0.3);
 });
 </script>
 </body>
